@@ -1,0 +1,2260 @@
+<!DOCTYPE html>
+<html lang="ja" class="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>チケット当落管理ツール</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+<style>
+@keyframes shake {
+  0%,100%{transform:translateX(0)}
+  12%{transform:translateX(-10px)} 25%{transform:translateX(10px)}
+  37%{transform:translateX(-8px)}  50%{transform:translateX(8px)}
+  62%{transform:translateX(-5px)}  75%{transform:translateX(5px)}
+  87%{transform:translateX(-2px)}
+}
+@keyframes slideIn { from{transform:translateX(120%);opacity:0} to{transform:translateX(0);opacity:1} }
+@keyframes fadeOut { from{opacity:1} to{opacity:0;pointer-events:none} }
+@keyframes fadeIn  { from{opacity:0;transform:scale(0.97)} to{opacity:1;transform:scale(1)} }
+
+.shake       { animation: shake 0.45s ease-in-out; }
+.toast       { animation: slideIn 0.3s ease forwards; }
+.toast-exit  { animation: fadeOut 0.4s ease forwards; }
+.modal-inner { animation: fadeIn 0.2s ease forwards; }
+
+.drag-handle { cursor:grab; opacity:.35; transition:opacity .15s; }
+.drag-handle:hover { opacity:1; }
+.sortable-ghost { opacity:.3; background:rgba(99,102,241,.15)!important; border-radius:8px; }
+
+/* Seat btn */
+.seat-btn { transition:all .15s; }
+.seat-btn.active-ippan { background:#334155!important; color:#f1f5f9!important; border-color:#64748b!important; box-shadow:0 0 0 2px #64748b55; }
+.seat-btn.active-b     { background:#1d4ed8!important; color:#eff6ff!important; border-color:#3b82f6!important; box-shadow:0 0 0 2px #3b82f640; }
+.seat-btn.active-a     { background:#059669!important; color:#ecfdf5!important; border-color:#10b981!important; box-shadow:0 0 0 2px #10b98140; }
+.seat-btn.active-s     { background:#d97706!important; color:#fffbeb!important; border-color:#fbbf24!important; box-shadow:0 0 0 2px #fbbf2440; }
+.seat-btn.active-ss    { background:#9333ea!important; color:#faf5ff!important; border-color:#c084fc!important; box-shadow:0 0 0 2px #c084fc40; }
+.seat-btn.active-any  { background:#334155!important; color:#e2e8f0!important; border-color:#94a3b8!important; box-shadow:0 0 0 2px #94a3b855; }
+
+/* Result toggle buttons */
+.result-btn { transition:all .15s; }
+.result-btn.active-pending { background:#713f12!important; color:#fef3c7!important; border-color:#d97706!important; box-shadow:0 0 0 2px #d9770640; }
+.result-btn.active-won     { background:#14532d!important; color:#bbf7d0!important; border-color:#16a34a!important; box-shadow:0 0 0 2px #16a34a40; }
+.result-btn.active-lost    { background:#7f1d1d!important; color:#fecaca!important; border-color:#dc2626!important; box-shadow:0 0 0 2px #dc262640; }
+
+/* Option toggle buttons */
+.opt-btn { transition:all .15s; }
+.opt-btn.active-party { background:#312e81!important; color:#c7d2fe!important; border-color:#6366f1!important; box-shadow:0 0 0 2px #6366f140; }
+.opt-btn.active-stay  { background:#0c4a6e!important; color:#bae6fd!important; border-color:#0284c7!important; box-shadow:0 0 0 2px #0284c740; }
+
+/* Tab nav */
+.nav-tab { border-bottom:2px solid transparent; transition:all .15s; color:#94a3b8; }
+.nav-tab:hover { color:#e2e8f0; }
+.nav-tab.active-tab { border-bottom-color:#6366f1; color:#c7d2fe; }
+
+/* Match type buttons */
+.match-type-btn { transition:all .15s; }
+.match-type-btn.active-give { background:#064e3b!important; color:#6ee7b7!important; border-color:#059669!important; box-shadow:0 0 0 2px #05996940; }
+.match-type-btn.active-want { background:#431407!important; color:#fed7aa!important; border-color:#f97316!important; box-shadow:0 0 0 2px #f9731640; }
+
+/* Match filter buttons */
+.mfilter-btn { border:1px solid #334155; background:#1e293b; color:#94a3b8; transition:all .15s; }
+.mfilter-btn:hover { background:#334155; color:#cbd5e1; }
+.mfilter-btn.active { background:#312e81!important; color:#c7d2fe!important; border-color:#6366f1!important; }
+
+/* Matching cards */
+.match-card-give { border-color:#059669!important; }
+.match-card-want { border-color:#f97316!important; }
+.match-give-badge { background:#064e3b; color:#6ee7b7; border:1px solid #059669; }
+.match-want-badge { background:#431407; color:#fed7aa; border:1px solid #f97316; }
+
+/* Tag toggle buttons (matching form) */
+.btn-tag { background:#1e293b; border:1px solid #334155; color:#94a3b8; transition:all .15s; cursor:pointer; }
+.btn-tag:hover { background:#334155; color:#cbd5e1; }
+.btn-tag.active-green  { background:#14532d!important; color:#bbf7d0!important; border-color:#16a34a!important; }
+.btn-tag.active-amber  { background:#713f12!important; color:#fef3c7!important; border-color:#d97706!important; }
+.btn-tag.active-slate  { background:#334155!important; color:#e2e8f0!important; border-color:#64748b!important; }
+.btn-tag.active-blue   { background:#1e3a8a!important; color:#bfdbfe!important; border-color:#3b82f6!important; }
+.btn-tag.active-rose   { background:#881337!important; color:#fecdd3!important; border-color:#e11d48!important; }
+.btn-tag.active-purple { background:#3b0764!important; color:#e9d5ff!important; border-color:#7c3aed!important; }
+.btn-tag.active-cyan   { background:#083344!important; color:#a5f3fc!important; border-color:#0891b2!important; }
+
+/* Transaction status badges on cards */
+.status-open        { background:#14532d; color:#bbf7d0; border:1px solid #16a34a; }
+.status-negotiating { background:#713f12; color:#fef3c7; border:1px solid #d97706; }
+.status-done        { background:#1e293b; color:#64748b; border:1px solid #334155; }
+
+/* Info tags on cards */
+.info-tag         { background:#1e293b; border:1px solid #334155; color:#cbd5e1; font-size:.65rem; padding:3px 7px; border-radius:5px; white-space:nowrap; display:inline-flex; align-items:center; gap:3px; }
+.info-tag-ticket  { background:#1e293b; border:1px solid #334155; color:#a5b4fc; }
+.info-tag-trade   { background:#1a1a2e; border:1px solid #2d2d4e; color:#c4b5fd; }
+/* Flexible / "any" badges (want mode) */
+.seat-any-badge { background:#0f172a; color:#64748b; border:1px dashed #475569; font-style:italic; }
+.flex-badge     { background:#0f172a; color:#64748b; border:1px dashed #475569; font-size:.65rem; padding:2px 7px; border-radius:5px; white-space:nowrap; display:inline-flex; align-items:center; gap:3px; font-style:italic; }
+
+/* Result badges */
+.badge-won     { background:#166534; color:#bbf7d0; border:1px solid #16a34a; }
+.badge-lost    { background:#7f1d1d; color:#fecaca; border:1px solid #dc2626; }
+.badge-pending { background:#713f12; color:#fef3c7; border:1px solid #d97706; }
+
+/* Seat badges */
+.sb-ippan { background:#1e293b; color:#94a3b8; border:1px solid #334155; }
+.sb-b     { background:#1e3a8a; color:#93c5fd; border:1px solid #1d4ed8; }
+.sb-a     { background:#14532d; color:#86efac; border:1px solid #15803d; }
+.sb-s     { background:#451a03; color:#fcd34d; border:1px solid #92400e; }
+.sb-ss    { background:#3b0764; color:#e9d5ff; border:1px solid #7c3aed; }
+
+/* Live/perf inline badges */
+.live-badge { background:#1e1b4b; color:#a5b4fc; border:1px solid #312e81; }
+.perf-badge { background:#0c2240; color:#67e8f9; border:1px solid #0e4d6e; }
+
+/* Scrollbar */
+::-webkit-scrollbar { width:6px; height:6px; }
+::-webkit-scrollbar-track { background:#0f172a; }
+::-webkit-scrollbar-thumb { background:#334155; border-radius:3px; }
+::-webkit-scrollbar-thumb:hover { background:#475569; }
+
+input[type="date"] { color-scheme:dark; }
+select option { background:#1e293b; color:#f1f5f9; }
+.checkbox-custom { accent-color:#6366f1; }
+.trow:hover { background:rgba(30,41,59,.5); }
+.trow-editing { background:rgba(245,158,11,.07)!important; }
+.member-card:hover { background:rgba(30,41,59,.7); }
+</style>
+<script>tailwind.config = { darkMode:'class' };</script>
+</head>
+<body class="bg-slate-950 text-slate-200 min-h-screen">
+
+<!-- TOAST -->
+<div id="toast-container" class="fixed top-4 right-4 z-[200] flex flex-col gap-2 pointer-events-none"></div>
+
+<!-- ===== WORKSPACE MODAL ===== -->
+<div id="ws-modal" class="hidden fixed inset-0 z-[80] flex items-center justify-center bg-black/75 backdrop-blur-sm">
+  <div id="ws-modal-inner" class="modal-inner bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-md mx-4 max-h-[85vh] flex flex-col shadow-2xl">
+    <div class="flex items-center justify-between px-5 py-4 border-b border-slate-800 flex-shrink-0">
+      <h3 class="font-semibold text-slate-100 flex items-center gap-2">
+        <i class="fa-solid fa-layer-group text-indigo-400"></i> プロジェクト管理
+      </h3>
+      <button onclick="closeWsModal()" class="text-slate-400 hover:text-slate-200 transition p-1 rounded">
+        <i class="fa-solid fa-xmark text-lg"></i>
+      </button>
+    </div>
+    <div class="overflow-y-auto flex-1 p-4">
+      <div id="ws-list" class="flex flex-col gap-2 mb-4"></div>
+      <div class="border-t border-slate-800 pt-4">
+        <p class="text-xs text-slate-500 mb-2 font-medium uppercase tracking-wide">新規プロジェクト作成</p>
+        <div class="flex gap-2">
+          <input id="new-ws-name" type="text" placeholder="プロジェクト名"
+            class="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500">
+          <button onclick="createWorkspace()"
+            class="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-lg transition text-sm font-semibold">
+            <i class="fa-solid fa-plus"></i>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== SETTINGS MODAL ===== -->
+<div id="settings-modal" class="hidden fixed inset-0 z-[80] flex items-center justify-center bg-black/75 backdrop-blur-sm">
+  <div id="settings-modal-inner" class="modal-inner bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-xl mx-4 max-h-[90vh] flex flex-col shadow-2xl">
+    <div class="flex items-center justify-between px-5 py-4 border-b border-slate-800 flex-shrink-0">
+      <h3 class="font-semibold text-slate-100 flex items-center gap-2">
+        <i class="fa-solid fa-gear text-indigo-400"></i> ライブ・公演 設定
+      </h3>
+      <button onclick="confirmCloseSettings()" class="text-slate-400 hover:text-slate-200 transition p-1 rounded">
+        <i class="fa-solid fa-xmark text-lg"></i>
+      </button>
+    </div>
+    <div class="overflow-y-auto flex-1 p-4">
+      <div id="settings-lives-sortable" class="flex flex-col gap-3"></div>
+      <button onclick="addLive()"
+        class="mt-3 w-full border border-dashed border-slate-700 hover:border-indigo-500 text-slate-500 hover:text-indigo-400 text-sm py-2.5 rounded-xl transition flex items-center justify-center gap-2">
+        <i class="fa-solid fa-plus"></i> ライブを追加
+      </button>
+    </div>
+    <div class="px-5 py-4 border-t border-slate-800 flex justify-end gap-2 flex-shrink-0">
+      <button onclick="confirmCloseSettings()"
+        class="bg-slate-700 hover:bg-slate-600 text-slate-300 text-sm px-4 py-2 rounded-lg transition">キャンセル</button>
+      <button onclick="saveSettings()"
+        class="bg-indigo-600 hover:bg-indigo-500 text-white text-sm px-5 py-2 rounded-lg transition font-semibold">
+        <i class="fa-solid fa-floppy-disk mr-1"></i>保存
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== DISCARD CONFIRM MODAL ===== -->
+<div id="discard-modal" class="hidden fixed inset-0 z-[90] flex items-center justify-center bg-black/80 backdrop-blur-sm">
+  <div class="modal-inner bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-sm mx-4 p-6 shadow-2xl">
+    <div class="flex items-start gap-3 mb-5">
+      <div class="w-10 h-10 rounded-full bg-amber-900/40 border border-amber-700/50 flex items-center justify-center flex-shrink-0">
+        <i class="fa-solid fa-triangle-exclamation text-amber-400"></i>
+      </div>
+      <div>
+        <h3 class="font-bold text-slate-100 mb-1">変更を破棄しますか？</h3>
+        <p class="text-sm text-slate-400">未保存の変更があります。破棄してもよいですか？</p>
+      </div>
+    </div>
+    <div class="flex gap-2">
+      <button onclick="closeDiscardModal()"
+        class="flex-1 py-2.5 bg-slate-700 hover:bg-slate-600 text-slate-200 font-semibold rounded-xl text-sm transition">
+        編集を続ける
+      </button>
+      <button onclick="forceDiscard()"
+        class="flex-1 py-2.5 bg-red-700 hover:bg-red-600 text-white font-bold rounded-xl text-sm transition flex items-center justify-center gap-2">
+        <i class="fa-solid fa-trash-can text-xs"></i> 変更を破棄
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== IMPORT CONFIRM MODAL ===== -->
+<div id="import-modal" class="hidden fixed inset-0 z-[90] flex items-center justify-center bg-black/80 backdrop-blur-sm">
+  <div class="modal-inner bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-sm mx-4 p-6 shadow-2xl">
+    <div class="flex items-start gap-3 mb-5">
+      <div class="w-10 h-10 rounded-full bg-indigo-900/40 border border-indigo-700/50 flex items-center justify-center flex-shrink-0">
+        <i class="fa-solid fa-upload text-indigo-400"></i>
+      </div>
+      <div>
+        <h3 class="font-bold text-slate-100 mb-1">データをインポート</h3>
+        <p class="text-sm text-slate-400">現在の全データを上書きします。この操作は取り消せません。</p>
+      </div>
+    </div>
+    <div class="flex gap-2">
+      <button onclick="closeImportModal()"
+        class="flex-1 py-2.5 bg-slate-700 hover:bg-slate-600 text-slate-200 font-semibold rounded-xl text-sm transition">
+        キャンセル
+      </button>
+      <button onclick="confirmImport()"
+        class="flex-1 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl text-sm transition">
+        インポートする
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== HEADER ===== -->
+<header class="bg-slate-900 border-b border-slate-800 sticky top-0 z-40">
+  <div class="max-w-7xl mx-auto px-3 sm:px-6 py-3 flex items-center gap-3">
+    <div class="flex-1 flex items-center gap-3 min-w-0">
+      <i class="fa-solid fa-ticket text-indigo-400 text-lg flex-shrink-0"></i>
+      <span class="text-sm font-bold text-slate-100 hidden sm:block flex-shrink-0">チケット当落管理</span>
+      <button id="ws-switcher"
+        class="flex items-center gap-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-sm px-3 py-1.5 rounded-lg transition max-w-[200px] sm:max-w-[280px] min-w-0">
+        <i class="fa-solid fa-layer-group text-indigo-400 text-xs flex-shrink-0"></i>
+        <span id="ws-name-display" class="truncate">マイプロジェクト</span>
+        <i class="fa-solid fa-chevron-down text-slate-500 text-xs flex-shrink-0 ml-auto"></i>
+      </button>
+    </div>
+    <div class="flex items-center gap-1.5 flex-shrink-0">
+      <button id="settings-btn"
+        class="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 text-sm px-3 py-1.5 rounded-lg transition flex items-center gap-1.5">
+        <i class="fa-solid fa-gear"></i><span class="hidden sm:inline">設定</span>
+      </button>
+      <button id="export-csv-btn"
+        class="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 text-sm px-2.5 py-1.5 rounded-lg transition" title="CSVエクスポート">
+        <i class="fa-solid fa-file-csv"></i>
+      </button>
+      <button id="export-json-btn"
+        class="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 text-sm px-2.5 py-1.5 rounded-lg transition" title="JSONエクスポート">
+        <i class="fa-solid fa-download"></i>
+      </button>
+      <button id="import-btn"
+        class="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 text-sm px-2.5 py-1.5 rounded-lg transition" title="JSONインポート">
+        <i class="fa-solid fa-upload"></i>
+      </button>
+      <input type="file" id="import-file-input" accept=".json" class="hidden">
+    </div>
+  </div>
+</header>
+
+<!-- ===== TAB NAV ===== -->
+<div class="bg-slate-900/90 border-b border-slate-800 backdrop-blur-sm sticky top-[56px] z-30">
+  <div class="max-w-7xl mx-auto px-3 sm:px-6">
+    <div class="flex">
+      <button id="tab-manager" onclick="switchTab('manager')"
+        class="nav-tab active-tab flex items-center gap-2 px-5 py-3 text-sm font-semibold">
+        <i class="fa-solid fa-ticket-simple"></i>
+        <span>当落管理</span>
+      </button>
+      <button id="tab-matching" onclick="switchTab('matching')"
+        class="nav-tab flex items-center gap-2 px-5 py-3 text-sm font-semibold">
+        <i class="fa-solid fa-arrows-left-right"></i>
+        <span>マッチングボード</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== MAIN ===== -->
+<main class="max-w-7xl mx-auto px-3 sm:px-6 pb-40">
+
+<!-- ==================== MANAGER SECTION ==================== -->
+<section id="section-manager" class="pt-3">
+
+  <!-- STATS -->
+  <div id="stats-cards" class="grid grid-cols-4 gap-2 mb-4"></div>
+
+  <!-- ADD/EDIT MEMBER FORM -->
+  <div id="form-section" class="bg-slate-900 border border-slate-800 rounded-xl p-4 sm:p-5 mb-4">
+    <h2 id="form-title" class="text-sm font-semibold text-slate-300 mb-4 flex items-center gap-2">
+      <i class="fa-solid fa-user-plus text-indigo-400"></i> メンバー追加
+    </h2>
+
+    <!-- Name / Live / Perf -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+      <div>
+        <label class="block text-xs text-slate-400 mb-1.5">お名前 <span class="text-red-400">*</span></label>
+        <input id="f-name" type="text" placeholder="35Pさん" autocomplete="off"
+          class="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500">
+      </div>
+      <div>
+        <label class="block text-xs text-slate-400 mb-1.5">ライブ</label>
+        <select id="f-live"
+          class="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-sm text-slate-200 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"></select>
+      </div>
+      <div>
+        <label class="block text-xs text-slate-400 mb-1.5">公演</label>
+        <select id="f-perf"
+          class="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-sm text-slate-200 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"></select>
+      </div>
+    </div>
+
+    <!-- Seat -->
+    <div class="mt-4">
+      <label class="block text-xs text-slate-400 mb-2">席種</label>
+      <div id="seat-btns" class="flex gap-2.5 flex-wrap"></div>
+      <input type="hidden" id="f-seat" value="一般">
+    </div>
+
+    <!-- Result + Options -->
+    <div class="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div>
+        <label class="block text-xs text-slate-400 mb-2">結果</label>
+        <div id="result-btns" class="flex gap-2"></div>
+        <input type="hidden" id="f-result" value="pending">
+      </div>
+      <div>
+        <label class="block text-xs text-slate-400 mb-2">オプション</label>
+        <div class="flex gap-2">
+          <button type="button" id="opt-afterparty" onclick="toggleOption('afterparty')"
+            class="opt-btn flex-1 py-3 rounded-xl border border-slate-600 text-slate-400 bg-slate-800 text-sm font-semibold transition flex items-center justify-center gap-2">
+            <i class="fa-solid fa-champagne-glasses text-xs"></i> 打ち上げ
+          </button>
+          <button type="button" id="opt-accommodation" onclick="toggleOption('accommodation')"
+            class="opt-btn flex-1 py-3 rounded-xl border border-slate-600 text-slate-400 bg-slate-800 text-sm font-semibold transition flex items-center justify-center gap-2">
+            <i class="fa-solid fa-bed text-xs"></i> 宿泊
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Submit / Cancel -->
+    <div class="mt-5 flex gap-2">
+      <button id="form-cancel-btn"
+        class="hidden bg-slate-700 hover:bg-slate-600 text-slate-300 text-sm px-5 py-3 rounded-xl transition font-semibold">
+        キャンセル
+      </button>
+      <button id="form-submit-btn"
+        class="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white py-3.5 rounded-xl transition font-bold text-base flex items-center justify-center gap-2">
+        <i id="form-submit-icon" class="fa-solid fa-plus"></i>
+        <span id="form-submit-label">追加</span>
+      </button>
+    </div>
+    <input type="hidden" id="f-edit-id">
+  </div>
+
+  <!-- FILTER + SORT -->
+  <div class="flex flex-wrap gap-2 mb-3 items-center">
+    <div class="relative">
+      <i class="fa-solid fa-magnifying-glass absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500 text-xs pointer-events-none"></i>
+      <input id="filter-name" type="text" placeholder="名前で検索..." autocomplete="off"
+        class="bg-slate-800 border border-slate-700 rounded-lg pl-7 pr-3 py-1.5 text-sm text-slate-300 placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 w-36 sm:w-44">
+    </div>
+    <select id="filter-live"
+      class="bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-slate-300 focus:outline-none focus:border-indigo-500">
+      <option value="">全ライブ</option>
+    </select>
+    <select id="filter-perf"
+      class="bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-slate-300 focus:outline-none focus:border-indigo-500">
+      <option value="">全公演</option>
+    </select>
+    <select id="filter-result"
+      class="bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-slate-300 focus:outline-none focus:border-indigo-500">
+      <option value="">全結果</option>
+      <option value="won">当選</option>
+      <option value="lost">落選</option>
+      <option value="pending">結果待ち</option>
+    </select>
+    <select id="sort-by"
+      class="bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-slate-300 focus:outline-none focus:border-indigo-500 ml-auto">
+      <option value="custom">追加順</option>
+      <option value="name">名前順</option>
+      <option value="live">ライブ順</option>
+      <option value="result">結果順</option>
+      <option value="seat">座席順</option>
+    </select>
+    <span id="filtered-count" class="text-xs text-slate-500"></span>
+  </div>
+
+  <!-- MEMBER LIST -->
+  <div class="mb-6">
+    <div id="table-wrap" class="hidden sm:block bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="border-b border-slate-800 text-slate-400 text-xs bg-slate-800/40">
+            <th class="w-8 px-2 py-2.5"></th>
+            <th class="w-8 px-2 py-2.5">
+              <input type="checkbox" id="select-all" class="checkbox-custom" title="全選択">
+            </th>
+            <th class="w-8 px-2 py-2.5 text-left">#</th>
+            <th class="px-3 py-2.5 text-left">名前</th>
+            <th class="px-3 py-2.5 text-left">ライブ / 公演</th>
+            <th class="px-3 py-2.5 text-left">席種</th>
+            <th class="px-3 py-2.5 text-left">結果</th>
+            <th class="px-3 py-2.5 text-left">備考</th>
+            <th class="px-3 py-2.5"></th>
+          </tr>
+        </thead>
+        <tbody id="members-tbody"></tbody>
+      </table>
+      <div id="table-empty" class="hidden text-center py-14 text-slate-500 text-sm">
+        <i class="fa-solid fa-users-slash text-3xl mb-3 block text-slate-700"></i>メンバーがいません
+      </div>
+    </div>
+    <div id="cards-container" class="sm:hidden flex flex-col gap-2"></div>
+    <div id="cards-empty" class="sm:hidden hidden text-center py-14 text-slate-500 text-sm">
+      <i class="fa-solid fa-users-slash text-3xl mb-3 block text-slate-700"></i>メンバーがいません
+    </div>
+  </div>
+
+  <!-- SUMMARY -->
+  <div class="bg-slate-900 border border-slate-800 rounded-xl p-4">
+    <div class="flex items-center justify-between mb-3 flex-wrap gap-2">
+      <h2 class="text-sm font-semibold text-slate-300 flex items-center gap-2">
+        <i class="fa-solid fa-clipboard-list text-indigo-400"></i> サマリーテキスト
+      </h2>
+      <button id="copy-summary-btn"
+        class="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 text-xs px-3 py-1.5 rounded-lg transition flex items-center gap-1.5">
+        <i class="fa-regular fa-copy"></i> コピー
+      </button>
+    </div>
+    <div class="flex flex-wrap gap-3 mb-3">
+      <label class="flex items-center gap-1.5 cursor-pointer text-xs text-slate-400">
+        <input type="checkbox" id="sum-lost" class="checkbox-custom"> 落選を含む
+      </label>
+      <label class="flex items-center gap-1.5 cursor-pointer text-xs text-slate-400">
+        <input type="checkbox" id="sum-pending" checked class="checkbox-custom"> 結果待ちを含む
+      </label>
+      <label class="flex items-center gap-1.5 cursor-pointer text-xs text-slate-400">
+        <input type="checkbox" id="sum-seat" checked class="checkbox-custom"> 席種を含む
+      </label>
+      <label class="flex items-center gap-1.5 cursor-pointer text-xs text-slate-400">
+        <input type="checkbox" id="sum-stats" checked class="checkbox-custom"> 統計を含む
+      </label>
+    </div>
+    <pre id="summary-output"
+      class="bg-slate-950 border border-slate-800 rounded-lg p-3 text-xs text-slate-300 whitespace-pre-wrap font-mono leading-relaxed min-h-[80px]"></pre>
+  </div>
+
+</section><!-- /section-manager -->
+
+<!-- ==================== MATCHING SECTION ==================== -->
+<section id="section-matching" class="hidden pt-3">
+
+  <!-- Matching form -->
+  <div id="match-form-section" class="bg-slate-900 border border-slate-800 rounded-xl p-4 sm:p-5 mb-4">
+    <h2 class="text-sm font-semibold text-slate-300 mb-4 flex items-center gap-2">
+      <i class="fa-solid fa-arrows-left-right text-indigo-400"></i> マッチング登録
+    </h2>
+
+    <!-- Type -->
+    <div class="mb-4">
+      <label class="block text-xs text-slate-400 mb-2">タイプ <span class="text-red-400">*</span></label>
+      <div class="grid grid-cols-2 gap-2">
+        <button type="button" onclick="setMatchType('give')" data-match-type="give"
+          class="match-type-btn active-give py-3 rounded-xl border border-slate-600 text-slate-400 bg-slate-800 text-sm font-bold transition flex items-center justify-center gap-2">
+          <i class="fa-solid fa-right-from-bracket text-xs"></i> 譲（余り）
+        </button>
+        <button type="button" onclick="setMatchType('want')" data-match-type="want"
+          class="match-type-btn py-3 rounded-xl border border-slate-600 text-slate-400 bg-slate-800 text-sm font-bold transition flex items-center justify-center gap-2">
+          <i class="fa-solid fa-right-to-bracket text-xs"></i> 求（探している）
+        </button>
+      </div>
+      <input type="hidden" id="m-type" value="give">
+    </div>
+
+    <!-- Name -->
+    <div class="mb-4">
+      <label class="block text-xs text-slate-400 mb-1.5">お名前 <span class="text-red-400">*</span></label>
+      <input id="m-name" type="text" list="member-names-list" placeholder="35Pさん" autocomplete="off"
+        class="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500">
+      <datalist id="member-names-list"></datalist>
+    </div>
+
+    <!-- ── SECTION: チケット情報 ── -->
+    <div class="flex items-center gap-2 mb-2">
+      <i class="fa-solid fa-ticket text-slate-600 text-xs"></i>
+      <span class="text-xs font-bold text-slate-500 tracking-widest uppercase">チケット情報</span>
+      <div class="flex-1 h-px bg-slate-800"></div>
+    </div>
+    <div class="bg-slate-800/40 border border-slate-800 rounded-xl p-3 mb-4 flex flex-col gap-3">
+
+      <!-- Live / Perf -->
+      <div class="grid grid-cols-2 gap-2">
+        <div>
+          <label class="block text-xs text-slate-400 mb-1.5">ライブ</label>
+          <select id="m-live" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-indigo-500"></select>
+        </div>
+        <div>
+          <label class="block text-xs text-slate-400 mb-1.5">公演</label>
+          <select id="m-perf" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-indigo-500"></select>
+        </div>
+      </div>
+
+      <!-- 席種 + 枚数 -->
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="block text-xs text-slate-400 mb-1.5">席種</label>
+          <div id="m-seat-btns" class="flex gap-1.5 flex-wrap"></div>
+          <input type="hidden" id="m-seat" value="一般">
+        </div>
+        <div>
+          <label class="block text-xs text-slate-400 mb-1.5">枚数</label>
+          <div class="flex items-center gap-2">
+            <button type="button" onclick="adjustCount(-1)"
+              class="w-9 h-9 rounded-lg bg-slate-800 border border-slate-600 text-slate-300 hover:bg-slate-700 text-xl font-bold transition flex items-center justify-center">−</button>
+            <span id="m-count-display" class="text-2xl font-black text-slate-100 w-8 text-center">1</span>
+            <button type="button" onclick="adjustCount(1)"
+              class="w-9 h-9 rounded-lg bg-slate-800 border border-slate-600 text-slate-300 hover:bg-slate-700 text-xl font-bold transition flex items-center justify-center">＋</button>
+            <span class="text-xs text-slate-500">枚</span>
+            <input type="hidden" id="m-count" value="1">
+          </div>
+        </div>
+      </div>
+
+      <!-- FC枠 + プレイガイド -->
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="block text-xs text-slate-400 mb-1.5">申込枠</label>
+          <div id="mg-fc" class="flex gap-1.5 flex-wrap">
+            <input type="hidden" id="m-fc" value="general">
+            <button type="button" onclick="selectMatchTag('mg-fc','fc')" data-val="fc" data-active="active-amber"
+              class="btn-tag px-2.5 py-1.5 rounded-lg text-xs font-semibold">FC枠</button>
+            <button type="button" onclick="selectMatchTag('mg-fc','general')" data-val="general" data-active="active-slate"
+              class="btn-tag active-slate px-2.5 py-1.5 rounded-lg text-xs font-semibold">一般枠</button>
+          </div>
+        </div>
+        <div>
+          <label class="block text-xs text-slate-400 mb-1.5">プレイガイド</label>
+          <input type="hidden" id="m-guide" value="lawson">
+          <div class="flex items-center gap-2 bg-slate-800 border border-slate-700 rounded-lg px-3 h-9">
+            <i class="fa-solid fa-mobile-screen text-rose-400 text-xs flex-shrink-0"></i>
+            <span id="m-guide-label" class="text-xs text-slate-500 italic">ライブを選択すると自動設定されます</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 先行種別 -->
+      <div>
+        <label class="block text-xs text-slate-400 mb-1.5">先行種別</label>
+        <div id="mg-priority" class="flex gap-1.5 flex-wrap">
+          <input type="hidden" id="m-priority" value="first">
+          <button type="button" onclick="onPriorityChange('first')" data-val="first" data-active="active-cyan"
+            class="btn-tag active-cyan px-2.5 py-1.5 rounded-lg text-xs font-semibold">1次先行</button>
+          <button type="button" onclick="onPriorityChange('second')" data-val="second" data-active="active-cyan"
+            class="btn-tag px-2.5 py-1.5 rounded-lg text-xs font-semibold">2次先行</button>
+          <button type="button" onclick="onPriorityChange('third')" data-val="third" data-active="active-cyan"
+            class="btn-tag px-2.5 py-1.5 rounded-lg text-xs font-semibold">3次先行</button>
+          <button type="button" onclick="onPriorityChange('general')" data-val="general" data-active="active-cyan"
+            class="btn-tag px-2.5 py-1.5 rounded-lg text-xs font-semibold">一般販売</button>
+          <button type="button" onclick="onPriorityChange('resale')" data-val="resale" data-active="active-cyan"
+            class="btn-tag px-2.5 py-1.5 rounded-lg text-xs font-semibold">リセール</button>
+          <button type="button" onclick="onPriorityChange('other')" data-val="other" data-active="active-cyan"
+            class="btn-tag px-2.5 py-1.5 rounded-lg text-xs font-semibold">その他</button>
+          <button type="button" id="m-priority-any-btn" onclick="onPriorityChange('any')" data-val="any" data-active="active-slate"
+            class="btn-tag hidden px-2.5 py-1.5 rounded-lg text-xs font-semibold italic">こだわらない</button>
+        </div>
+        <div id="m-priority-other-wrap" class="hidden mt-2">
+          <input id="m-priority-other" type="text" placeholder="先行種別を入力..."
+            class="w-full bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-indigo-500">
+        </div>
+      </div>
+
+    </div><!-- /チケット情報 -->
+
+    <!-- ── SECTION: 取引条件 ── -->
+    <div class="flex items-center gap-2 mb-2">
+      <i class="fa-solid fa-handshake text-slate-600 text-xs"></i>
+      <span class="text-xs font-bold text-slate-500 tracking-widest uppercase">取引条件</span>
+      <div class="flex-1 h-px bg-slate-800"></div>
+    </div>
+    <div class="bg-slate-800/40 border border-slate-800 rounded-xl p-3 mb-4 flex flex-col gap-3">
+
+      <!-- ステータス -->
+      <div>
+        <label class="block text-xs text-slate-400 mb-1.5">取引ステータス <span class="text-red-400">*</span></label>
+        <div id="mg-status" class="flex gap-1.5 flex-wrap">
+          <input type="hidden" id="m-status" value="open">
+          <button type="button" onclick="selectMatchTag('mg-status','open')" data-val="open" data-active="active-green"
+            class="btn-tag active-green px-2.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1">
+            <i class="fa-solid fa-circle-dot text-xs"></i> 募集中
+          </button>
+          <button type="button" onclick="selectMatchTag('mg-status','negotiating')" data-val="negotiating" data-active="active-amber"
+            class="btn-tag px-2.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1">
+            <i class="fa-solid fa-arrows-rotate text-xs"></i> 交渉中
+          </button>
+          <button type="button" onclick="selectMatchTag('mg-status','done')" data-val="done" data-active="active-slate"
+            class="btn-tag px-2.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1">
+            <i class="fa-solid fa-check text-xs"></i> 取引完了
+          </button>
+        </div>
+      </div>
+
+      <!-- 金額 / 受け渡し / 精算 (3-col) -->
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div>
+          <label class="block text-xs text-slate-400 mb-1.5">金額条件</label>
+          <div id="mg-price" class="flex gap-1.5 flex-wrap">
+            <input type="hidden" id="m-price" value="consult">
+            <button type="button" onclick="selectMatchTag('mg-price','fee')" data-val="fee" data-active="active-purple"
+              class="btn-tag px-2.5 py-1.5 rounded-lg text-xs font-semibold">定価+手数料</button>
+            <button type="button" onclick="selectMatchTag('mg-price','face')" data-val="face" data-active="active-purple"
+              class="btn-tag px-2.5 py-1.5 rounded-lg text-xs font-semibold">定価のみ</button>
+            <button type="button" onclick="selectMatchTag('mg-price','consult')" data-val="consult" data-active="active-purple"
+              class="btn-tag active-purple px-2.5 py-1.5 rounded-lg text-xs font-semibold">要相談</button>
+            <button type="button" id="m-price-any-btn" onclick="selectMatchTag('mg-price','any')" data-val="any" data-active="active-slate"
+              class="btn-tag hidden px-2.5 py-1.5 rounded-lg text-xs font-semibold italic">こだわらない</button>
+          </div>
+        </div>
+        <div>
+          <label class="block text-xs text-slate-400 mb-1.5">受け渡し方法</label>
+          <div id="mg-transfer" class="flex gap-1.5 flex-wrap">
+            <input type="hidden" id="m-transfer" value="app">
+            <button type="button" onclick="selectMatchTag('mg-transfer','app')" data-val="app" data-active="active-blue"
+              class="btn-tag active-blue px-2.5 py-1.5 rounded-lg text-xs font-semibold">アプリ分配</button>
+            <button type="button" onclick="selectMatchTag('mg-transfer','together')" data-val="together" data-active="active-blue"
+              class="btn-tag px-2.5 py-1.5 rounded-lg text-xs font-semibold">同時入場</button>
+            <button type="button" onclick="selectMatchTag('mg-transfer','consult')" data-val="consult" data-active="active-blue"
+              class="btn-tag px-2.5 py-1.5 rounded-lg text-xs font-semibold">要相談</button>
+            <button type="button" id="m-transfer-any-btn" onclick="selectMatchTag('mg-transfer','any')" data-val="any" data-active="active-slate"
+              class="btn-tag hidden px-2.5 py-1.5 rounded-lg text-xs font-semibold italic">こだわらない</button>
+          </div>
+        </div>
+        <div>
+          <label class="block text-xs text-slate-400 mb-1.5">精算方法</label>
+          <div id="mg-settlement" class="flex gap-1.5 flex-wrap">
+            <input type="hidden" id="m-settlement" value="prepay">
+            <button type="button" onclick="selectMatchTag('mg-settlement','prepay')" data-val="prepay" data-active="active-purple"
+              class="btn-tag active-purple px-2.5 py-1.5 rounded-lg text-xs font-semibold">事前送金</button>
+            <button type="button" onclick="selectMatchTag('mg-settlement','cash')" data-val="cash" data-active="active-purple"
+              class="btn-tag px-2.5 py-1.5 rounded-lg text-xs font-semibold">当日手渡し</button>
+            <button type="button" onclick="selectMatchTag('mg-settlement','consult')" data-val="consult" data-active="active-purple"
+              class="btn-tag px-2.5 py-1.5 rounded-lg text-xs font-semibold">要相談</button>
+            <button type="button" id="m-settlement-any-btn" onclick="selectMatchTag('mg-settlement','any')" data-val="any" data-active="active-slate"
+              class="btn-tag hidden px-2.5 py-1.5 rounded-lg text-xs font-semibold italic">こだわらない</button>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /取引条件 -->
+
+    <!-- ── SECTION: 連絡先・備考 ── -->
+    <div class="flex items-center gap-2 mb-2">
+      <i class="fa-solid fa-comment-dots text-slate-600 text-xs"></i>
+      <span class="text-xs font-bold text-slate-500 tracking-widest uppercase">連絡先・備考</span>
+      <div class="flex-1 h-px bg-slate-800"></div>
+    </div>
+    <div class="bg-slate-800/40 border border-slate-800 rounded-xl p-3 mb-4 flex flex-col gap-3">
+      <div>
+        <label class="block text-xs text-slate-400 mb-1.5">連絡先（任意）</label>
+        <input id="m-contact" type="text" placeholder="X(旧Twitter)のID、DM可 等" autocomplete="off"
+          class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-indigo-500">
+      </div>
+      <div>
+        <label class="block text-xs text-slate-400 mb-1.5">備考（任意）</label>
+        <textarea id="m-note" placeholder="補足事項、条件など..." rows="2"
+          class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-slate-200 placeholder-slate-500 resize-none focus:outline-none focus:border-indigo-500"></textarea>
+      </div>
+    </div><!-- /連絡先・備考 -->
+
+    <!-- Submit / Cancel -->
+    <div class="flex gap-2">
+      <button id="m-cancel-btn" onclick="cancelMatchEdit()"
+        class="hidden bg-slate-700 hover:bg-slate-600 text-slate-300 text-sm px-5 py-3 rounded-xl transition font-semibold">
+        キャンセル
+      </button>
+      <button id="m-submit-btn" onclick="addMatchingEntry()"
+        class="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white py-3.5 rounded-xl transition font-bold text-base flex items-center justify-center gap-2">
+        <i id="m-submit-icon" class="fa-solid fa-plus"></i>
+        <span id="m-submit-label">登録する</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Filter bar -->
+  <div class="flex flex-wrap gap-2 mb-3 items-center">
+    <button id="mf-all" onclick="setMatchFilter('all')"
+      class="mfilter-btn active px-3 py-1.5 rounded-lg text-sm font-semibold">すべて</button>
+    <button id="mf-give" onclick="setMatchFilter('give')"
+      class="mfilter-btn px-3 py-1.5 rounded-lg text-sm font-semibold flex items-center gap-1.5">
+      <i class="fa-solid fa-circle text-emerald-400 text-xs"></i> 譲のみ
+    </button>
+    <button id="mf-want" onclick="setMatchFilter('want')"
+      class="mfilter-btn px-3 py-1.5 rounded-lg text-sm font-semibold flex items-center gap-1.5">
+      <i class="fa-regular fa-circle text-orange-400 text-xs"></i> 求のみ
+    </button>
+    <select id="mf-live"
+      class="bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-slate-300 focus:outline-none focus:border-indigo-500">
+      <option value="">全ライブ</option>
+    </select>
+    <select id="mf-perf"
+      class="bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-slate-300 focus:outline-none focus:border-indigo-500">
+      <option value="">全公演</option>
+    </select>
+    <label class="flex items-center gap-1.5 cursor-pointer text-xs text-slate-400 select-none">
+      <input type="checkbox" id="mf-hide-done" class="checkbox-custom">
+      <span>完了を隠す</span>
+    </label>
+    <button onclick="fetchFromGas()" title="最新データに更新"
+      class="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 text-xs px-3 py-1.5 rounded-lg transition flex items-center gap-1.5">
+      <i class="fa-solid fa-rotate-right"></i> 更新
+    </button>
+    <button onclick="copyMatchingSummary()"
+      class="ml-auto bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 text-xs px-3 py-1.5 rounded-lg transition flex items-center gap-1.5">
+      <i class="fa-regular fa-copy"></i> サマリーコピー
+    </button>
+  </div>
+
+  <!-- Loading indicator -->
+  <div id="match-loading" class="hidden flex items-center justify-center py-10">
+    <div class="flex items-center gap-3">
+      <i class="fa-solid fa-circle-notch fa-spin text-indigo-400 text-xl"></i>
+      <span class="text-sm text-slate-400">データを読み込み中...</span>
+    </div>
+  </div>
+
+  <!-- Cards grid -->
+  <div id="matching-list" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3"></div>
+  <div id="matching-empty" class="hidden text-center py-14 text-slate-500 text-sm">
+    <i class="fa-solid fa-ticket text-3xl mb-3 block text-slate-700"></i>
+    <span class="empty-msg">マッチング情報がありません</span>
+  </div>
+
+</section><!-- /section-matching -->
+
+</main>
+
+<!-- ===== BULK ACTION BAR ===== -->
+<div id="bulk-bar" class="hidden fixed bottom-14 left-0 right-0 z-50 flex justify-center px-4">
+  <div class="bg-slate-800 border border-slate-600 rounded-xl shadow-2xl px-4 py-2.5 flex flex-wrap items-center gap-2 max-w-2xl w-full">
+    <span id="bulk-count" class="text-sm font-semibold text-slate-200 mr-1"></span>
+    <button onclick="bulkChangeStatus('won')"
+      class="bg-emerald-900 hover:bg-emerald-800 border border-emerald-700 text-emerald-200 text-xs px-3 py-1.5 rounded-lg transition">当選に変更</button>
+    <button onclick="bulkChangeStatus('lost')"
+      class="bg-red-900 hover:bg-red-800 border border-red-700 text-red-200 text-xs px-3 py-1.5 rounded-lg transition">落選に変更</button>
+    <button onclick="bulkChangeStatus('pending')"
+      class="bg-amber-900 hover:bg-amber-800 border border-amber-700 text-amber-200 text-xs px-3 py-1.5 rounded-lg transition">結果待ちに変更</button>
+    <button onclick="bulkDelete()"
+      class="bg-red-950 hover:bg-red-900 border border-red-800 text-red-300 text-xs px-3 py-1.5 rounded-lg transition ml-auto flex items-center gap-1">
+      <i class="fa-solid fa-trash text-xs"></i> 削除
+    </button>
+    <button onclick="clearSelection()" class="text-slate-400 hover:text-slate-200 px-1.5 py-1.5 rounded transition">
+      <i class="fa-solid fa-xmark text-base"></i>
+    </button>
+  </div>
+</div>
+
+<!-- ===== DISCORD EDIT BAR ===== -->
+<div id="edit-bar" class="hidden fixed bottom-0 left-0 right-0 z-50">
+  <div id="edit-bar-inner" class="bg-[#111214] border-t border-[#2b2d31] shadow-[0_-4px_24px_rgba(0,0,0,.6)] px-4 py-3">
+    <div class="max-w-7xl mx-auto flex items-center gap-3 flex-wrap">
+      <i class="fa-solid fa-triangle-exclamation text-amber-400 flex-shrink-0"></i>
+      <p class="text-sm flex-1 whitespace-nowrap">
+        <span class="font-semibold text-white">気をつけてください</span>
+        <span class="text-slate-400"> — </span>
+        <span class="text-slate-300">未保存の変更があります！</span>
+      </p>
+      <button onclick="cancelEdit()"
+        class="text-slate-300 hover:text-white text-sm underline px-3 py-1.5 rounded transition font-medium">
+        リセット
+      </button>
+      <button onclick="saveEditFromBar()"
+        class="bg-[#248046] hover:bg-[#1a6334] text-white text-sm font-bold px-4 py-1.5 rounded transition">
+        変更を保存する
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== MATCH EDIT BAR ===== -->
+<div id="match-edit-bar" class="hidden fixed bottom-0 left-0 right-0 z-50">
+  <div id="match-edit-bar-inner" class="bg-[#111214] border-t border-[#2b2d31] shadow-[0_-4px_24px_rgba(0,0,0,.6)] px-4 py-3">
+    <div class="max-w-7xl mx-auto flex items-center gap-3 flex-wrap">
+      <i class="fa-solid fa-triangle-exclamation text-amber-400 flex-shrink-0"></i>
+      <p class="text-sm flex-1 whitespace-nowrap">
+        <span class="font-semibold text-white">気をつけてください</span>
+        <span class="text-slate-400"> — </span>
+        <span class="text-slate-300">未保存の変更があります！</span>
+      </p>
+      <button onclick="cancelMatchEdit()"
+        class="text-slate-300 hover:text-white text-sm underline px-3 py-1.5 rounded transition font-medium">
+        リセット
+      </button>
+      <button onclick="addMatchingEntry()"
+        class="bg-[#248046] hover:bg-[#1a6334] text-white text-sm font-bold px-4 py-1.5 rounded transition">
+        変更を保存する
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ============================================================
+// STATE & CONSTANTS
+// ============================================================
+const STORAGE_KEY  = 'ticket-app-v3';
+const SEAT_TYPES   = ['一般','B','A','S','SS'];
+const SEAT_CLS     = {'一般':'ippan','B':'b','A':'a','S':'s','SS':'ss'};
+const SEAT_ORDER   = {'一般':0,'B':1,'A':2,'S':3,'SS':4};
+const RESULT_LABEL = {won:'当選',lost:'落選',pending:'結果待ち'};
+const RESULT_ORDER    = {won:0,lost:1,pending:2};
+const MATCH_STATUS    = {open:'募集中',negotiating:'交渉中',done:'取引完了'};
+const MATCH_TRANSFER  = {app:'アプリ分配',together:'同時入場',consult:'要相談',any:'こだわらない'};
+const MATCH_GUIDE     = {lawson:'ローチケ',eplus:'e+',pia:'チケットぴあ',other:'その他'};
+const MATCH_SETTLEMENT= {prepay:'事前送金',cash:'当日手渡し',consult:'要相談',any:'こだわらない'};
+const MATCH_FC        = {fc:'FC枠',general:'一般枠'};
+const MATCH_PRIORITY  = {first:'1次先行',second:'2次先行',third:'3次先行',general:'一般販売',resale:'リセール',other:'その他'};
+const MATCH_PRICE     = {fee:'定価+手数料',face:'定価のみ',consult:'要相談',any:'こだわらない'};
+const LIVE_PALETTE    = ['#6366f1','#ec4899','#f97316','#10b981','#3b82f6','#8b5cf6','#f59e0b','#06b6d4','#ef4444','#84cc16'];
+
+let state          = null;
+let settingsDraft  = null;
+let pendingImport  = null;
+let discardTarget  = null;
+let selectedIds    = new Set();
+let memberSortable = null;
+let cardSortable   = null;
+let currentTab     = 'manager';
+let matchTypeFilter= 'all';
+let matchCount     = 1;
+let editingMatchId = null;
+
+// ============================================================
+// GAS CONFIG  ※デプロイ後にURLを書き換えてください
+// ============================================================
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbzks9aIIcS4KDTOiGUMhR7nFYc_shEZhOzqCXoS7HzLjvx1kSAgSeUa5vR1Y4zi1YZsBw/exec';
+let gasLives  = [];
+let gasBoard  = [];
+
+// ============================================================
+// UTILS
+// ============================================================
+function genId(p='id'){ return p+'_'+Math.random().toString(36).slice(2,10); }
+function esc(s){ return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function pad(n){ return String(n).padStart(2,'0'); }
+function fmtDate(d){
+  if(!d) return '';
+  const dt=new Date(d+'T00:00:00');
+  if(isNaN(dt)) return '';
+  return `${dt.getFullYear()}/${pad(dt.getMonth()+1)}/${pad(dt.getDate())}`;
+}
+function fmtPerfDate(p){
+  if(!p) return '';
+  const s=fmtDate(p.dateStart), e=fmtDate(p.dateEnd);
+  if(!s) return '';
+  if(!e||e===s) return s;
+  const sd=new Date(p.dateStart+'T00:00:00'), ed=new Date(p.dateEnd+'T00:00:00');
+  if(sd.getMonth()===ed.getMonth()) return `${sd.getMonth()+1}/${sd.getDate()}〜${ed.getDate()}`;
+  return `${s}〜${e}`;
+}
+function toast(msg,type='success'){
+  const c=document.getElementById('toast-container');
+  const t=document.createElement('div');
+  const cfg={
+    success:{bg:'bg-emerald-900 border-emerald-700',txt:'text-emerald-200',ico:'fa-circle-check text-emerald-400'},
+    error:  {bg:'bg-red-900 border-red-700',        txt:'text-red-200',   ico:'fa-circle-xmark text-red-400'},
+    info:   {bg:'bg-slate-800 border-slate-600',    txt:'text-slate-200', ico:'fa-circle-info text-indigo-400'},
+  }[type]||{bg:'bg-slate-800 border-slate-600',txt:'text-slate-200',ico:'fa-circle-info text-indigo-400'};
+  t.className=`toast pointer-events-auto ${cfg.bg} border rounded-xl px-4 py-2.5 text-sm ${cfg.txt} shadow-2xl flex items-center gap-2`;
+  t.innerHTML=`<i class="fa-solid ${cfg.ico}"></i>${esc(msg)}`;
+  c.appendChild(t);
+  setTimeout(()=>{ t.classList.add('toast-exit'); t.addEventListener('animationend',()=>t.remove(),{once:true}); },2800);
+}
+function _shake(el){
+  if(!el) return;
+  el.classList.remove('shake'); void el.offsetWidth;
+  el.classList.add('shake');
+  el.addEventListener('animationend',()=>el.classList.remove('shake'),{once:true});
+}
+
+// ============================================================
+// STORAGE
+// ============================================================
+function defaultState(){
+  const wsId=genId('ws'), lId=genId('live');
+  return {
+    workspaces:[{
+      id:wsId, name:'マイプロジェクト',
+      lives:[{ id:lId, name:'ライブA', color:LIVE_PALETTE[0], guide:'lawson',
+        performances:[
+          {id:genId('p'),name:'Day1',dateStart:'',dateEnd:''},
+          {id:genId('p'),name:'Day2',dateStart:'',dateEnd:''}
+        ]
+      }],
+      members:[], matchingBoard:[]
+    }],
+    currentWsId:wsId
+  };
+}
+
+function migrateFromV2(){
+  try {
+    const rawLives=localStorage.getItem('ticket-lives-v1');
+    const rawMembers=localStorage.getItem('ticket-tofuru-v2');
+    if(!rawLives&&!rawMembers) return null;
+    const oldLives=rawLives?JSON.parse(rawLives):[];
+    const oldMembers=rawMembers?JSON.parse(rawMembers):[];
+    const wsId=genId('ws');
+    const lives=oldLives.map((l,i)=>({
+      id:genId('live'), name:l.name||'', color:LIVE_PALETTE[i%LIVE_PALETTE.length], guide:l.guide||'lawson',
+      performances:(l.performances||[]).map(p=>({
+        id:genId('p'), name:p.name||'', dateStart:p.dateStart||'', dateEnd:p.dateEnd||''
+      }))
+    }));
+    const members=oldMembers.map((m,i)=>({
+      id:String(m.id||genId('mem')), name:m.name||'', live:m.live||'',
+      performance:m.performance||'', seatType:m.seatType||'一般',
+      result:m.result||'pending', afterparty:!!m.afterparty,
+      accommodation:!!m.accommodation, addedAt:m.addedAt||Date.now(), sortOrder:i
+    }));
+    return { workspaces:[{id:wsId,name:'移行済みデータ',lives,members,matchingBoard:[]}], currentWsId:wsId };
+  } catch(e){ return null; }
+}
+
+function loadState(){
+  try {
+    const raw=localStorage.getItem(STORAGE_KEY);
+    if(raw){ state=JSON.parse(raw); return; }
+  } catch(e){}
+  const migrated=migrateFromV2();
+  if(migrated){ state=migrated; saveState(); return; }
+  state=defaultState();
+}
+function saveState(){ localStorage.setItem(STORAGE_KEY,JSON.stringify(state)); }
+function currentWs(){ return state.workspaces.find(w=>w.id===state.currentWsId)||state.workspaces[0]; }
+function getMatchBoard(){ const ws=currentWs(); if(!ws.matchingBoard) ws.matchingBoard=[]; return ws.matchingBoard; }
+
+// ============================================================
+// TAB
+// ============================================================
+function switchTab(tab){
+  currentTab=tab;
+  document.getElementById('section-manager').classList.toggle('hidden',tab!=='manager');
+  document.getElementById('section-matching').classList.toggle('hidden',tab!=='matching');
+  document.getElementById('tab-manager').classList.toggle('active-tab',tab==='manager');
+  document.getElementById('tab-matching').classList.toggle('active-tab',tab==='matching');
+  if(tab==='matching'){ populateMatchingFormSelects(); renderMatchingBoard(); fetchFromGas(); }
+}
+
+// ============================================================
+// WORKSPACE
+// ============================================================
+function openWsModal(){ renderWsModal(); document.getElementById('ws-modal').classList.remove('hidden'); document.getElementById('new-ws-name').value=''; }
+function closeWsModal(){ document.getElementById('ws-modal').classList.add('hidden'); }
+function renderWsModal(){
+  const ws=currentWs();
+  document.getElementById('ws-list').innerHTML=state.workspaces.map(w=>`
+    <div class="flex items-center gap-2 bg-slate-800 border ${w.id===ws.id?'border-indigo-600':'border-slate-700'} rounded-xl px-3 py-2.5">
+      <i class="fa-solid fa-layer-group ${w.id===ws.id?'text-indigo-400':'text-slate-500'} text-sm flex-shrink-0"></i>
+      <span class="flex-1 text-sm text-slate-200 truncate">${esc(w.name)}</span>
+      ${w.id===ws.id?'<span class="text-xs text-indigo-400 font-semibold px-2 py-0.5 bg-indigo-950 rounded-full flex-shrink-0">現在</span>':''}
+      <button onclick="switchWorkspace('${esc(w.id)}')" class="text-slate-400 hover:text-indigo-400 transition p-1.5 rounded" title="切替"><i class="fa-solid fa-right-to-bracket text-xs"></i></button>
+      <button onclick="renameWorkspace('${esc(w.id)}')" class="text-slate-400 hover:text-amber-400 transition p-1.5 rounded" title="名称変更"><i class="fa-solid fa-pen text-xs"></i></button>
+      ${state.workspaces.length>1?`<button onclick="deleteWorkspace('${esc(w.id)}')" class="text-slate-400 hover:text-red-400 transition p-1.5 rounded" title="削除"><i class="fa-solid fa-trash text-xs"></i></button>`:''}
+    </div>
+  `).join('');
+}
+function createWorkspace(){
+  const inp=document.getElementById('new-ws-name');
+  const name=inp.value.trim();
+  if(!name){ _shake(inp); return; }
+  const id=genId('ws');
+  state.workspaces.push({id,name,lives:[],members:[],matchingBoard:[]});
+  state.currentWsId=id; saveState(); inp.value='';
+  renderWsModal(); renderAll();
+  toast('プロジェクトを作成しました');
+}
+function renameWorkspace(id){
+  const w=state.workspaces.find(x=>x.id===id); if(!w) return;
+  const name=prompt('新しい名前を入力してください:',w.name);
+  if(!name||!name.trim()) return;
+  w.name=name.trim(); saveState(); renderWsModal(); renderAll();
+  toast('名前を変更しました');
+}
+function deleteWorkspace(id){
+  if(state.workspaces.length<=1){ toast('最後のプロジェクトは削除できません','error'); return; }
+  if(!confirm('このプロジェクトを削除しますか？この操作は取り消せません。')) return;
+  state.workspaces=state.workspaces.filter(w=>w.id!==id);
+  if(state.currentWsId===id) state.currentWsId=state.workspaces[0].id;
+  saveState(); renderWsModal(); renderAll();
+  toast('プロジェクトを削除しました');
+}
+function switchWorkspace(id){
+  state.currentWsId=id; saveState(); closeWsModal();
+  clearSelection(); _doCancelEdit(); cancelMatchEdit();
+  matchCount=1;
+  const mDisp=document.getElementById('m-count-display'); if(mDisp) mDisp.textContent='1';
+  const mInp=document.getElementById('m-count'); if(mInp) mInp.value='1';
+  renderAll();
+  toast('プロジェクトを切り替えました','info');
+}
+
+// ============================================================
+// SETTINGS
+// ============================================================
+function openSettings(){
+  settingsDraft=JSON.parse(JSON.stringify(currentWs().lives));
+  renderSettingsModal();
+  document.getElementById('settings-modal').classList.remove('hidden');
+}
+function closeSettings(){ document.getElementById('settings-modal').classList.add('hidden'); settingsDraft=null; }
+function confirmCloseSettings(){ if(isSettingsDirty()){ discardTarget='settings'; openDiscardModal(); } else { closeSettings(); } }
+function isSettingsDirty(){ if(!settingsDraft) return false; syncSettingsFromDOM(); return JSON.stringify(settingsDraft)!==JSON.stringify(currentWs().lives); }
+function saveSettings(){
+  syncSettingsFromDOM();
+  const ws=currentWs();
+  const cleaned=settingsDraft.map(l=>({...l,name:l.name.trim(),performances:l.performances.map(p=>({...p,name:p.name.trim()}))})).filter(l=>l.name);
+  if(cleaned.length===0){ toast('ライブを1つ以上追加してください','error'); return; }
+  ws.lives=cleaned; saveState(); closeSettings(); renderAll();
+  toast('設定を保存しました');
+  postToGas({action:'syncLives',lives:cleaned}).then(r=>{
+    if(r&&r.success&&!r.local){ gasLives=cleaned; toast('ライブ設定をクラウドに同期しました','info'); }
+    else if(r===null){ toast('ライブ設定のクラウド同期に失敗しました','error'); }
+  });
+}
+function renderSettingsModal(){
+  const container=document.getElementById('settings-lives-sortable');
+  container.innerHTML=(settingsDraft||[]).map(live=>`
+    <div class="live-block bg-slate-800 border border-slate-700 rounded-xl p-3" data-live-id="${esc(live.id)}">
+      <div class="flex items-center gap-2 mb-2.5">
+        <span class="drag-handle text-slate-500 px-1"><i class="fa-solid fa-grip-vertical"></i></span>
+        <input type="color" value="${esc(live.color||LIVE_PALETTE[0])}"
+          class="live-color-input w-8 h-8 rounded cursor-pointer border border-slate-600 flex-shrink-0 p-0.5 bg-slate-700"
+          title="ライブカラー">
+        <input type="text" value="${esc(live.name)}" placeholder="ライブ名"
+          class="live-name-input flex-1 bg-slate-700 border border-slate-600 rounded-lg px-3 py-1.5 text-sm text-slate-200 focus:outline-none focus:border-indigo-500">
+        <select class="live-guide-select bg-slate-700 border border-slate-600 rounded-lg px-2 py-1.5 text-xs text-slate-300 focus:outline-none focus:border-indigo-500 flex-shrink-0" title="プレイガイド">
+          <option value="lawson"${(live.guide==='lawson'||!live.guide)?' selected':''}>ローチケ</option>
+          <option value="eplus"${live.guide==='eplus'?' selected':''}>e+</option>
+          <option value="pia"${live.guide==='pia'?' selected':''}>ぴあ</option>
+          <option value="other"${live.guide==='other'?' selected':''}>その他</option>
+        </select>
+        <button onclick="removeLive('${esc(live.id)}')" class="text-slate-500 hover:text-red-400 transition p-1.5 rounded" title="削除"><i class="fa-solid fa-trash-can text-sm"></i></button>
+      </div>
+      <div class="perf-list flex flex-col gap-1.5 ml-6 mb-2" data-live-id="${esc(live.id)}">
+        ${live.performances.map(p=>`
+          <div class="perf-item flex items-center gap-2 bg-slate-700/50 border border-slate-600/60 rounded-lg px-2 py-1.5 flex-wrap" data-perf-id="${esc(p.id)}">
+            <span class="drag-handle text-slate-600 text-xs"><i class="fa-solid fa-grip-vertical"></i></span>
+            <input type="text" value="${esc(p.name)}" placeholder="公演名" class="perf-name-input flex-1 min-w-[80px] bg-transparent border-0 text-sm text-slate-300 focus:outline-none">
+            <input type="date" value="${esc(p.dateStart||'')}" class="perf-date-start bg-slate-700 border border-slate-600 rounded px-2 py-0.5 text-xs text-slate-300 focus:outline-none focus:border-indigo-500" style="width:8rem" title="開始日">
+            <span class="text-slate-600 text-xs">〜</span>
+            <input type="date" value="${esc(p.dateEnd||'')}" class="perf-date-end bg-slate-700 border border-slate-600 rounded px-2 py-0.5 text-xs text-slate-300 focus:outline-none focus:border-indigo-500" style="width:8rem" title="終了日">
+            <button onclick="removePerf('${esc(live.id)}','${esc(p.id)}')" class="text-slate-500 hover:text-red-400 transition p-1 rounded"><i class="fa-solid fa-times text-xs"></i></button>
+          </div>
+        `).join('')}
+      </div>
+      <button onclick="addPerf('${esc(live.id)}')" class="ml-6 text-xs text-slate-500 hover:text-indigo-400 transition flex items-center gap-1 px-2 py-1 rounded">
+        <i class="fa-solid fa-plus"></i> 公演を追加
+      </button>
+    </div>
+  `).join('');
+  initSettingsSortable();
+}
+function syncSettingsFromDOM(){
+  if(!settingsDraft) return;
+  const liveOrder=[];
+  document.querySelectorAll('.live-block').forEach(block=>{
+    const liveId=block.dataset.liveId;
+    const live=settingsDraft.find(l=>l.id===liveId); if(!live) return;
+    const ni=block.querySelector('.live-name-input'); if(ni) live.name=ni.value;
+    const ci=block.querySelector('.live-color-input'); if(ci) live.color=ci.value;
+    const gi=block.querySelector('.live-guide-select'); if(gi) live.guide=gi.value;
+    const perfOrder=[];
+    block.querySelectorAll('.perf-item').forEach(pi=>{
+      const perfId=pi.dataset.perfId;
+      const perf=live.performances.find(p=>p.id===perfId); if(!perf) return;
+      const pn=pi.querySelector('.perf-name-input');
+      const ps=pi.querySelector('.perf-date-start');
+      const pe=pi.querySelector('.perf-date-end');
+      if(pn) perf.name=pn.value; if(ps) perf.dateStart=ps.value; if(pe) perf.dateEnd=pe.value;
+      perfOrder.push(perf);
+    });
+    live.performances=perfOrder; liveOrder.push(live);
+  });
+  settingsDraft=liveOrder;
+}
+function addLive(){
+  syncSettingsFromDOM();
+  settingsDraft.push({id:genId('live'),name:'新しいライブ',color:LIVE_PALETTE[settingsDraft.length%LIVE_PALETTE.length],guide:'lawson',performances:[]});
+  renderSettingsModal();
+  const blocks=document.querySelectorAll('.live-block');
+  blocks[blocks.length-1]?.querySelector('.live-name-input')?.focus();
+}
+function removeLive(liveId){ syncSettingsFromDOM(); settingsDraft=settingsDraft.filter(l=>l.id!==liveId); renderSettingsModal(); }
+function addPerf(liveId){
+  syncSettingsFromDOM();
+  const live=settingsDraft.find(l=>l.id===liveId); if(!live) return;
+  live.performances.push({id:genId('p'),name:'新しい公演',dateStart:'',dateEnd:''});
+  renderSettingsModal();
+}
+function removePerf(liveId,perfId){
+  syncSettingsFromDOM();
+  const live=settingsDraft.find(l=>l.id===liveId); if(!live) return;
+  live.performances=live.performances.filter(p=>p.id!==perfId);
+  renderSettingsModal();
+}
+function initSettingsSortable(){
+  const lc=document.getElementById('settings-lives-sortable');
+  if(lc._sortable) lc._sortable.destroy();
+  lc._sortable=Sortable.create(lc,{handle:'.drag-handle',animation:150,ghostClass:'sortable-ghost',onEnd:()=>syncSettingsFromDOM()});
+  document.querySelectorAll('.perf-list').forEach(pl=>{
+    if(pl._sortable) pl._sortable.destroy();
+    pl._sortable=Sortable.create(pl,{handle:'.drag-handle',animation:150,ghostClass:'sortable-ghost',onEnd:()=>syncSettingsFromDOM()});
+  });
+}
+
+// ============================================================
+// FORM – SEAT / RESULT / OPTION BUTTONS
+// ============================================================
+function buildSeatBtns(){
+  const cur=document.getElementById('f-seat').value||'一般';
+  document.getElementById('seat-btns').innerHTML=SEAT_TYPES.map(s=>`
+    <button type="button" onclick="selectSeat('${s}')" data-seat="${s}"
+      class="seat-btn px-4 py-2.5 text-sm font-bold rounded-xl border border-slate-600 text-slate-300 bg-slate-800 ${cur===s?'active-'+SEAT_CLS[s]:''}">
+      ${esc(s)}
+    </button>
+  `).join('');
+}
+function selectSeat(s){
+  document.getElementById('f-seat').value=s;
+  document.querySelectorAll('[data-seat]').forEach(btn=>{
+    const bs=btn.dataset.seat;
+    btn.className=`seat-btn px-4 py-2.5 text-sm font-bold rounded-xl border border-slate-600 text-slate-300 bg-slate-800${bs===s?' active-'+SEAT_CLS[bs]:''}`;
+  });
+}
+function buildResultBtns(cur='pending'){
+  document.getElementById('f-result').value=cur;
+  document.getElementById('result-btns').innerHTML=[
+    {v:'pending',label:'<i class="fa-solid fa-clock text-xs"></i> 結果待ち'},
+    {v:'won',    label:'<i class="fa-solid fa-circle-check text-xs"></i> 当選'},
+    {v:'lost',   label:'<i class="fa-solid fa-circle-xmark text-xs"></i> 落選'},
+  ].map(o=>`
+    <button type="button" onclick="selectResult('${o.v}')" data-result="${o.v}"
+      class="result-btn flex-1 py-3 rounded-xl border border-slate-600 text-slate-400 bg-slate-800 text-sm font-semibold transition${cur===o.v?' active-'+o.v:''}">
+      ${o.label}
+    </button>
+  `).join('');
+}
+function selectResult(v){
+  document.getElementById('f-result').value=v;
+  document.querySelectorAll('[data-result]').forEach(btn=>{
+    btn.classList.remove('active-pending','active-won','active-lost');
+    if(btn.dataset.result===v) btn.classList.add('active-'+v);
+  });
+}
+function setOption(type,active){
+  const btn=document.getElementById('opt-'+type); if(!btn) return;
+  btn.classList.remove('active-party','active-stay');
+  if(active){
+    if(type==='afterparty') btn.classList.add('active-party');
+    else if(type==='accommodation') btn.classList.add('active-stay');
+  }
+}
+function toggleOption(type){
+  const btn=document.getElementById('opt-'+type); if(!btn) return;
+  const isActive=type==='afterparty'?btn.classList.contains('active-party'):btn.classList.contains('active-stay');
+  setOption(type,!isActive);
+}
+function getOption(type){
+  const btn=document.getElementById('opt-'+type); if(!btn) return false;
+  return type==='afterparty'?btn.classList.contains('active-party'):btn.classList.contains('active-stay');
+}
+
+// ============================================================
+// MEMBER FORM
+// ============================================================
+function populateFormSelects(){
+  const ws=currentWs();
+  const liveEl=document.getElementById('f-live');
+  const selLive=liveEl.value;
+  liveEl.innerHTML='<option value="">-- 選択 --</option>'+
+    ws.lives.map(l=>`<option value="${esc(l.name)}"${l.name===selLive?'selected':''}>${esc(l.name)}</option>`).join('');
+  updatePerfSelect();
+  buildSeatBtns();
+}
+function updatePerfSelect(){
+  const ws=currentWs();
+  const liveName=document.getElementById('f-live').value;
+  const perfEl=document.getElementById('f-perf');
+  const selPerf=perfEl.value;
+  const live=ws.lives.find(l=>l.name===liveName);
+  perfEl.innerHTML='<option value="">-- 選択 --</option>'+
+    (live?live.performances:[]).map(p=>{
+      const ds=fmtPerfDate(p);
+      return `<option value="${esc(p.name)}"${p.name===selPerf?'selected':''}>${esc(p.name)}${ds?' ('+ds+')':''}</option>`;
+    }).join('');
+}
+function onFormSubmit(){
+  const name=document.getElementById('f-name').value.trim();
+  if(!name){ _shake(document.getElementById('f-name')); toast('お名前を入力してください','error'); return; }
+  const editId=document.getElementById('f-edit-id').value;
+  const ws=currentWs();
+  const data={
+    name,
+    live:document.getElementById('f-live').value,
+    performance:document.getElementById('f-perf').value,
+    seatType:document.getElementById('f-seat').value||'一般',
+    result:document.getElementById('f-result').value||'pending',
+    afterparty:getOption('afterparty'),
+    accommodation:getOption('accommodation')
+  };
+  if(editId){
+    const m=ws.members.find(x=>x.id===editId);
+    if(m) Object.assign(m,data);
+    toast(`${name} を更新しました`);
+    _doCancelEdit();
+  } else {
+    ws.members.push({id:genId('mem'),...data,addedAt:Date.now(),sortOrder:ws.members.length});
+    toast(`${name} を追加しました`);
+    document.getElementById('f-name').value='';
+    buildResultBtns('pending');
+    setOption('afterparty',false);
+    setOption('accommodation',false);
+    document.getElementById('f-name').focus();
+  }
+  saveState(); renderAll();
+}
+let _pendingEditId=null;
+function startEdit(id){
+  const ws=currentWs();
+  const m=ws.members.find(x=>x.id===id); if(!m) return;
+  const editId=document.getElementById('f-edit-id').value;
+  if(editId&&editId!==id){ discardTarget='member'; _pendingEditId=id; openDiscardModal(); return; }
+  _doStartEdit(m);
+}
+function _doStartEdit(m){
+  document.getElementById('f-edit-id').value=m.id;
+  document.getElementById('f-name').value=m.name;
+  document.getElementById('f-live').value=m.live||'';
+  updatePerfSelect();
+  document.getElementById('f-perf').value=m.performance||'';
+  document.getElementById('f-seat').value=m.seatType||'一般';
+  buildSeatBtns();
+  buildResultBtns(m.result||'pending');
+  setOption('afterparty',!!m.afterparty);
+  setOption('accommodation',!!m.accommodation);
+  document.getElementById('form-title').innerHTML='<i class="fa-solid fa-pen text-amber-400"></i> 編集中: '+esc(m.name);
+  document.getElementById('form-submit-icon').className='fa-solid fa-floppy-disk';
+  document.getElementById('form-submit-label').textContent='更新';
+  document.getElementById('form-submit-btn').className='flex-1 bg-amber-600 hover:bg-amber-500 text-white py-3.5 rounded-xl transition font-bold text-base flex items-center justify-center gap-2';
+  document.getElementById('form-cancel-btn').classList.remove('hidden');
+  showEditBar();
+  document.getElementById('form-section').scrollIntoView({behavior:'smooth',block:'start'});
+  setTimeout(()=>document.getElementById('f-name').focus(),300);
+}
+function _doCancelEdit(){
+  document.getElementById('f-edit-id').value='';
+  document.getElementById('f-name').value='';
+  document.getElementById('f-live').value='';
+  updatePerfSelect();
+  document.getElementById('f-seat').value='一般';
+  buildSeatBtns();
+  buildResultBtns('pending');
+  setOption('afterparty',false);
+  setOption('accommodation',false);
+  document.getElementById('form-title').innerHTML='<i class="fa-solid fa-user-plus text-indigo-400"></i> メンバー追加';
+  document.getElementById('form-submit-icon').className='fa-solid fa-plus';
+  document.getElementById('form-submit-label').textContent='追加';
+  document.getElementById('form-submit-btn').className='flex-1 bg-indigo-600 hover:bg-indigo-500 text-white py-3.5 rounded-xl transition font-bold text-base flex items-center justify-center gap-2';
+  document.getElementById('form-cancel-btn').classList.add('hidden');
+  hideEditBar();
+}
+function cancelEdit(){
+  const editId=document.getElementById('f-edit-id').value;
+  if(editId){ discardTarget='member'; _pendingEditId=null; openDiscardModal(); } else { _doCancelEdit(); }
+}
+
+// ============================================================
+// MEMBER CRUD
+// ============================================================
+function deleteMember(id){
+  const ws=currentWs();
+  const m=ws.members.find(x=>x.id===id); if(!m) return;
+  if(!confirm(`「${m.name}」を削除しますか？`)) return;
+  ws.members=ws.members.filter(x=>x.id!==id);
+  if(document.getElementById('f-edit-id').value===id) _doCancelEdit();
+  selectedIds.delete(id);
+  saveState(); renderAll();
+  toast(`${m.name} を削除しました`,'info');
+}
+
+// ============================================================
+// RENDERING
+// ============================================================
+function renderAll(){
+  const ws=currentWs();
+  document.getElementById('ws-name-display').textContent=ws.name;
+  renderStatsCards();
+  populateFormSelects();
+  renderFilterOptions();
+  renderMemberList();
+  updateSummary();
+  if(currentTab==='matching'){ populateMatchingFormSelects(); renderMatchingBoard(); }
+}
+function renderStatsCards(){
+  const ws=currentWs();
+  const flLive=document.getElementById('filter-live')?.value||'';
+  const flPerf=document.getElementById('filter-perf')?.value||'';
+  // filter-result は分母・分子に影響させない
+  let base=ws.members;
+  if(flLive) base=base.filter(m=>m.live===flLive);
+  if(flPerf) base=base.filter(m=>m.performance===flPerf);
+  const won=base.filter(m=>m.result==='won').length;
+  const lost=base.filter(m=>m.result==='lost').length;
+  const pending=base.filter(m=>m.result==='pending').length;
+  const decided=won+lost;
+  // ライブ未選択時は複数イベント混在のため当選率を非表示
+  const hasLive=!!flLive;
+  const rateStr=hasLive?(decided>0?Math.round(won/decided*100)+' %':'—'):'— %';
+  const rateActive=hasLive&&decided>0;
+  document.getElementById('stats-cards').innerHTML=[
+    {label:'当選',    val:won,     icon:'fa-circle-check', col:'text-emerald-400',vcol:'text-slate-100',bg:'bg-emerald-950/40 border-emerald-900/60'},
+    {label:'落選',    val:lost,    icon:'fa-circle-xmark', col:'text-red-400',    vcol:'text-slate-100',bg:'bg-red-950/40 border-red-900/60'},
+    {label:'結果待ち',val:pending, icon:'fa-clock',        col:'text-amber-400',  vcol:'text-slate-100',bg:'bg-amber-950/40 border-amber-900/60'},
+    {label:'当選率',  val:rateStr, icon:'fa-chart-pie',
+      col:rateActive?'text-indigo-400':'text-slate-600',
+      vcol:rateActive?'text-slate-100':'text-slate-600',
+      bg:rateActive?'bg-indigo-950/40 border-indigo-900/60':'bg-slate-900/40 border-slate-800/60'},
+  ].map(c=>`
+    <div class="${c.bg} border rounded-xl p-2.5 flex flex-col items-center gap-0.5">
+      <i class="fa-solid ${c.icon} ${c.col} text-base"></i>
+      <span class="text-lg font-bold ${c.vcol} leading-tight">${c.val}</span>
+      <span class="text-xs text-slate-400 leading-tight">${c.label}</span>
+    </div>
+  `).join('');
+}
+function renderFilterOptions(){
+  const ws=currentWs();
+  const flLive=document.getElementById('filter-live');
+  const flPerf=document.getElementById('filter-perf');
+  const selLive=flLive.value, selPerf=flPerf.value;
+  flLive.innerHTML='<option value="">全ライブ</option>'+
+    ws.lives.map(l=>`<option value="${esc(l.name)}"${l.name===selLive?'selected':''}>${esc(l.name)}</option>`).join('');
+  const lv=ws.lives.find(l=>l.name===flLive.value);
+  flPerf.innerHTML='<option value="">全公演</option>'+
+    (lv?lv.performances:[]).map(p=>`<option value="${esc(p.name)}"${p.name===selPerf?'selected':''}>${esc(p.name)}</option>`).join('');
+}
+function getFiltered(){
+  const ws=currentWs();
+  const flLive=document.getElementById('filter-live').value;
+  const flPerf=document.getElementById('filter-perf').value;
+  const flResult=document.getElementById('filter-result').value;
+  const flName=(document.getElementById('filter-name')?.value||'').trim().toLowerCase();
+  const sortBy=document.getElementById('sort-by').value;
+  let list=ws.members.filter(m=>{
+    if(flLive&&m.live!==flLive) return false;
+    if(flPerf&&m.performance!==flPerf) return false;
+    if(flResult&&m.result!==flResult) return false;
+    if(flName&&!m.name.toLowerCase().includes(flName)) return false;
+    return true;
+  });
+  if(sortBy==='custom') list.sort((a,b)=>a.sortOrder-b.sortOrder);
+  else if(sortBy==='name') list.sort((a,b)=>a.name.localeCompare(b.name,'ja'));
+  else if(sortBy==='live'){
+    list.sort((a,b)=>{
+      const li=(ws.lives.findIndex(l=>l.name===a.live))-(ws.lives.findIndex(l=>l.name===b.live));
+      if(li!==0) return li;
+      const lv=ws.lives.find(l=>l.name===a.live); if(!lv) return 0;
+      return (lv.performances.findIndex(p=>p.name===a.performance))-(lv.performances.findIndex(p=>p.name===b.performance));
+    });
+  }
+  else if(sortBy==='result') list.sort((a,b)=>(RESULT_ORDER[a.result]??9)-(RESULT_ORDER[b.result]??9));
+  else if(sortBy==='seat') list.sort((a,b)=>(SEAT_ORDER[b.seatType]??0)-(SEAT_ORDER[a.seatType]??0));
+  return list;
+}
+function getPerfDate(ws,liveName,perfName){
+  const live=ws.lives.find(l=>l.name===liveName); if(!live) return '';
+  const perf=live.performances.find(p=>p.name===perfName); if(!perf) return '';
+  return fmtPerfDate(perf);
+}
+function seatBadge(s){ const cls=SEAT_CLS[s||'一般']||'ippan'; return `<span class="sb-${cls} px-2 py-0.5 rounded text-xs font-bold">${esc(s||'一般')}</span>`; }
+function resultBadge(r){ return `<span class="badge-${r||'pending'} px-2 py-0.5 rounded text-xs font-bold">${RESULT_LABEL[r]||r}</span>`; }
+function liveBadgeStyle(liveName){
+  const live=(gasLives.find(l=>l.name===liveName))||(currentWs().lives.find(l=>l.name===liveName));
+  if(!live||!live.color) return '';
+  const c=live.color;
+  return `background:${c}22;color:${c};border-color:${c}55;`;
+}
+
+function renderMemberList(){
+  const ws=currentWs();
+  const members=getFiltered();
+  const editId=document.getElementById('f-edit-id').value;
+  document.getElementById('filtered-count').textContent=members.length>0?`${members.length}件`:'';
+
+  const tbody=document.getElementById('members-tbody');
+  const tableEmpty=document.getElementById('table-empty');
+  if(members.length===0){
+    tbody.innerHTML=''; tableEmpty.classList.remove('hidden');
+  } else {
+    tableEmpty.classList.add('hidden');
+    tbody.innerHTML=members.map((m,i)=>{
+      const date=getPerfDate(ws,m.live,m.performance);
+      const extras=[m.afterparty?'打ち上げ':'',m.accommodation?'宿泊':''].filter(Boolean);
+      const isEditing=m.id===editId;
+      return `<tr class="trow border-b border-slate-800/50 transition-colors${isEditing?' trow-editing':''}" data-id="${esc(m.id)}">
+        <td class="px-2 py-2.5 text-center w-8"><span class="drag-handle text-slate-600"><i class="fa-solid fa-grip-vertical text-sm"></i></span></td>
+        <td class="px-2 py-2.5 text-center w-8"><input type="checkbox" class="row-check checkbox-custom" data-id="${esc(m.id)}" ${selectedIds.has(m.id)?'checked':''}></td>
+        <td class="px-2 py-2.5 text-slate-500 text-xs w-8">${i+1}</td>
+        <td class="px-3 py-2.5 font-semibold text-slate-100 whitespace-nowrap">${esc(m.name)}</td>
+        <td class="px-3 py-2.5">
+          <div class="flex flex-col gap-0.5">
+            ${m.live?`<span class="live-badge px-1.5 py-0.5 rounded text-xs inline-block" style="${liveBadgeStyle(m.live)}">${esc(m.live)}</span>`:''}
+            ${m.performance?`<span class="perf-badge px-1.5 py-0.5 rounded text-xs inline-block">${esc(m.performance)}${date?` <span class="opacity-60">· ${esc(date)}</span>`:''}</span>`:''}
+          </div>
+        </td>
+        <td class="px-3 py-2.5">${seatBadge(m.seatType)}</td>
+        <td class="px-3 py-2.5">${resultBadge(m.result)}</td>
+        <td class="px-3 py-2.5 text-xs">${extras.map(e=>`<span class="bg-slate-700/60 text-slate-400 px-1.5 py-0.5 rounded mr-1">${esc(e)}</span>`).join('')}</td>
+        <td class="px-3 py-2.5">
+          <div class="flex items-center gap-1">
+            <button onclick="startEdit('${esc(m.id)}')" class="text-slate-400 hover:text-indigo-400 transition p-1.5 rounded hover:bg-slate-700" title="編集"><i class="fa-solid fa-pen text-xs"></i></button>
+            <button onclick="deleteMember('${esc(m.id)}')" class="text-slate-400 hover:text-red-400 transition p-1.5 rounded hover:bg-slate-700" title="削除"><i class="fa-solid fa-trash text-xs"></i></button>
+          </div>
+        </td>
+      </tr>`;
+    }).join('');
+    document.getElementById('select-all').checked=members.length>0&&members.every(m=>selectedIds.has(m.id));
+  }
+
+  const cardsContainer=document.getElementById('cards-container');
+  const cardsEmpty=document.getElementById('cards-empty');
+  if(members.length===0){
+    cardsContainer.innerHTML=''; cardsEmpty.classList.remove('hidden');
+  } else {
+    cardsEmpty.classList.add('hidden');
+    cardsContainer.innerHTML=members.map(m=>{
+      const date=getPerfDate(ws,m.live,m.performance);
+      const extras=[m.afterparty?'打ち上げ':'',m.accommodation?'宿泊':''].filter(Boolean);
+      return `<div class="member-card bg-slate-900 border border-slate-800 rounded-xl p-3 transition-colors" data-id="${esc(m.id)}">
+        <div class="flex items-center gap-2 mb-1.5">
+          <span class="drag-handle text-slate-600"><i class="fa-solid fa-grip-vertical"></i></span>
+          <input type="checkbox" class="row-check checkbox-custom flex-shrink-0" data-id="${esc(m.id)}" ${selectedIds.has(m.id)?'checked':''}>
+          <span class="font-semibold text-slate-100 flex-1 text-sm min-w-0 truncate">${esc(m.name)}</span>
+          ${resultBadge(m.result)}
+        </div>
+        <div class="ml-8 flex flex-wrap gap-1 mb-1.5 items-center">
+          ${m.live?`<span class="live-badge px-1.5 py-0.5 rounded text-xs" style="${liveBadgeStyle(m.live)}">${esc(m.live)}</span>`:''}
+          ${m.performance?`<span class="perf-badge px-1.5 py-0.5 rounded text-xs">${esc(m.performance)}</span>`:''}
+          ${date?`<span class="text-xs text-slate-500">${esc(date)}</span>`:''}
+        </div>
+        <div class="ml-8 flex flex-wrap items-center gap-1.5">
+          ${seatBadge(m.seatType)}
+          ${extras.map(e=>`<span class="bg-slate-700/60 text-slate-400 text-xs px-1.5 py-0.5 rounded">${esc(e)}</span>`).join('')}
+          <div class="ml-auto flex gap-1">
+            <button onclick="startEdit('${esc(m.id)}')" class="text-slate-400 hover:text-indigo-400 transition p-1.5 rounded hover:bg-slate-700"><i class="fa-solid fa-pen text-xs"></i></button>
+            <button onclick="deleteMember('${esc(m.id)}')" class="text-slate-400 hover:text-red-400 transition p-1.5 rounded hover:bg-slate-700"><i class="fa-solid fa-trash text-xs"></i></button>
+          </div>
+        </div>
+      </div>`;
+    }).join('');
+  }
+  initMemberSortable();
+}
+
+// ============================================================
+// BULK ACTIONS
+// ============================================================
+function toggleSelectAll(checked){
+  const members=getFiltered();
+  if(checked) members.forEach(m=>selectedIds.add(m.id));
+  else members.forEach(m=>selectedIds.delete(m.id));
+  updateBulkBar(); renderMemberList();
+}
+function toggleSelect(id,checked){
+  if(checked) selectedIds.add(id); else selectedIds.delete(id);
+  updateBulkBar();
+  const sa=document.getElementById('select-all');
+  if(sa){ const members=getFiltered(); sa.checked=members.length>0&&members.every(m=>selectedIds.has(m.id)); }
+}
+function updateBulkBar(){
+  const bar=document.getElementById('bulk-bar');
+  if(selectedIds.size>0){ bar.classList.remove('hidden'); document.getElementById('bulk-count').textContent=`${selectedIds.size}件選択中`; }
+  else { bar.classList.add('hidden'); }
+}
+function bulkChangeStatus(result){
+  const ws=currentWs(), count=selectedIds.size;
+  ws.members.forEach(m=>{ if(selectedIds.has(m.id)) m.result=result; });
+  saveState(); clearSelection(); renderAll();
+  toast(`${count}件を${RESULT_LABEL[result]}に変更しました`,'info');
+}
+function bulkDelete(){
+  const count=selectedIds.size;
+  if(!confirm(`${count}件のメンバーを削除しますか？`)) return;
+  const ws=currentWs();
+  ws.members=ws.members.filter(m=>!selectedIds.has(m.id));
+  saveState(); clearSelection(); renderAll();
+  toast(`${count}件を削除しました`,'info');
+}
+function clearSelection(){
+  selectedIds.clear(); updateBulkBar();
+  document.querySelectorAll('.row-check').forEach(c=>c.checked=false);
+  const sa=document.getElementById('select-all'); if(sa) sa.checked=false;
+}
+
+// ============================================================
+// DRAG & DROP
+// ============================================================
+function initMemberSortable(){
+  const tbody=document.getElementById('members-tbody');
+  const cards=document.getElementById('cards-container');
+  if(memberSortable){ try{memberSortable.destroy();}catch(e){} memberSortable=null; }
+  if(cardSortable){   try{cardSortable.destroy();}catch(e){} cardSortable=null; }
+  if(document.getElementById('sort-by').value!=='custom') return;
+  memberSortable=Sortable.create(tbody,{handle:'.drag-handle',animation:150,ghostClass:'sortable-ghost',onEnd:()=>applyNewOrder(tbody,'tr')});
+  cardSortable=Sortable.create(cards,{handle:'.drag-handle',animation:150,ghostClass:'sortable-ghost',onEnd:()=>applyNewOrder(cards,'.member-card')});
+}
+function applyNewOrder(container,sel){
+  const ws=currentWs();
+  const order=[...container.querySelectorAll(sel)].map(el=>el.dataset.id).filter(Boolean);
+  order.forEach((id,i)=>{ const m=ws.members.find(x=>x.id===id); if(m) m.sortOrder=i; });
+  ws.members.sort((a,b)=>a.sortOrder-b.sortOrder);
+  saveState(); renderMemberList();
+}
+
+// ============================================================
+// SUMMARY
+// ============================================================
+function updateSummary(){
+  const ws=currentWs();
+  const incLost=document.getElementById('sum-lost').checked;
+  const incPending=document.getElementById('sum-pending').checked;
+  const incSeat=document.getElementById('sum-seat').checked;
+  const incStats=document.getElementById('sum-stats').checked;
+  const lines=[];
+  if(incStats){
+    const won=ws.members.filter(m=>m.result==='won').length;
+    const lost=ws.members.filter(m=>m.result==='lost').length;
+    const pending=ws.members.filter(m=>m.result==='pending').length;
+    const decided=won+lost;
+    const rate=decided>0?Math.round(won/decided*100)+' %':'—';
+    lines.push(`【${ws.name}】`);
+    lines.push(`合計: ${ws.members.length}人 / 当選: ${won}人 / 落選: ${lost}人 / 結果待ち: ${pending}人 / 当選率: ${rate}`);
+    lines.push('');
+  }
+  ws.lives.forEach(live=>{
+    const lm=ws.members.filter(m=>m.live===live.name); if(!lm.length) return;
+    lines.push(`■ ${live.name}`);
+    live.performances.forEach(perf=>{
+      const pm=lm.filter(m=>m.performance===perf.name); if(!pm.length) return;
+      const dateStr=fmtPerfDate(perf);
+      lines.push(`  ▶ ${perf.name}${dateStr?' ('+dateStr+')':''}`);
+      ['won','pending','lost'].forEach(res=>{
+        if(res==='lost'&&!incLost) return;
+        if(res==='pending'&&!incPending) return;
+        const group=pm.filter(m=>m.result===res); if(!group.length) return;
+        lines.push(`    [${RESULT_LABEL[res]}]`);
+        group.forEach(m=>{
+          let row=`    ・${m.name}`;
+          if(incSeat) row+=` (${m.seatType||'一般'})`;
+          if(m.afterparty) row+=' [打ち上げ]';
+          if(m.accommodation) row+=' [宿泊]';
+          lines.push(row);
+        });
+      });
+    });
+    const noPerf=lm.filter(m=>!m.performance);
+    if(noPerf.length){ lines.push('  ▶ 未割当'); noPerf.forEach(m=>lines.push(`    ・${m.name}`)); }
+    lines.push('');
+  });
+  const noLive=ws.members.filter(m=>!m.live);
+  if(noLive.length){ lines.push('■ ライブ未割当'); noLive.forEach(m=>lines.push(`  ・${m.name}`)); lines.push(''); }
+  document.getElementById('summary-output').textContent=lines.join('\n').trimEnd();
+}
+function copyText(){
+  const text=document.getElementById('summary-output').textContent;
+  if(!text.trim()){ toast('コピーするテキストがありません','error'); return; }
+  navigator.clipboard.writeText(text)
+    .then(()=>toast('クリップボードにコピーしました'))
+    .catch(()=>{ const el=document.getElementById('summary-output'); window.getSelection().selectAllChildren(el); toast('手動でコピーしてください','info'); });
+}
+
+// ============================================================
+// EXPORT / IMPORT
+// ============================================================
+function exportCSV(){
+  const ws=currentWs();
+  if(!ws.members.length){ toast('エクスポートするデータがありません','error'); return; }
+  const header=['名前','ライブ','公演','席種','結果','打ち上げ','宿泊'];
+  const rows=ws.members.map(m=>[
+    m.name,m.live||'',m.performance||'',m.seatType||'',
+    RESULT_LABEL[m.result]||'',m.afterparty?'○':'',m.accommodation?'○':''
+  ].map(v=>`"${String(v).replace(/"/g,'""')}"`).join(','));
+  const csv=[header.join(','),...rows].join('\r\n');
+  const blob=new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a'); a.href=url; a.download=`${ws.name}_members.csv`; a.click();
+  URL.revokeObjectURL(url); toast('CSVをエクスポートしました');
+}
+function exportJSON(){
+  const blob=new Blob([JSON.stringify(state,null,2)],{type:'application/json'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a'); a.href=url; a.download='ticket-app-data.json'; a.click();
+  URL.revokeObjectURL(url); toast('JSONをエクスポートしました');
+}
+function triggerImport(){ document.getElementById('import-file-input').click(); }
+function handleImportFile(e){
+  const file=e.target.files[0]; if(!file) return;
+  const reader=new FileReader();
+  reader.onload=ev=>{
+    try { pendingImport=JSON.parse(ev.target.result); document.getElementById('import-modal').classList.remove('hidden'); }
+    catch(err){ toast('無効なJSONファイルです','error'); }
+  };
+  reader.readAsText(file); e.target.value='';
+}
+function confirmImport(){
+  if(!pendingImport) return;
+  state=pendingImport; pendingImport=null;
+  saveState(); closeImportModal(); clearSelection(); _doCancelEdit(); renderAll();
+  toast('インポートしました');
+}
+function closeImportModal(){ document.getElementById('import-modal').classList.add('hidden'); pendingImport=null; }
+
+// ============================================================
+// DISCARD MODAL
+// ============================================================
+function openDiscardModal(){ document.getElementById('discard-modal').classList.remove('hidden'); }
+function closeDiscardModal(){ document.getElementById('discard-modal').classList.add('hidden'); _pendingEditId=null; discardTarget=null; }
+function forceDiscard(){
+  const target=discardTarget, pending=_pendingEditId;
+  closeDiscardModal();
+  if(target==='settings'){ closeSettings(); }
+  else { _doCancelEdit(); if(pending){ const ws=currentWs(); const m=ws.members.find(x=>x.id===pending); if(m) _doStartEdit(m); } }
+}
+
+// ============================================================
+// DISCORD BAR
+// ============================================================
+function showEditBar(){ document.getElementById('edit-bar').classList.remove('hidden'); }
+function hideEditBar(){ document.getElementById('edit-bar').classList.add('hidden'); }
+function triggerShake(){ _shake(document.getElementById('edit-bar-inner')); }
+function triggerSettingsShake(){ _shake(document.getElementById('settings-modal-inner')); }
+function saveEditFromBar(){
+  const name=document.getElementById('f-name').value.trim();
+  if(!name){
+    document.getElementById('form-section').scrollIntoView({behavior:'smooth',block:'start'});
+    setTimeout(()=>{ document.getElementById('f-name').focus(); toast('お名前を入力してください','error'); },300);
+    return;
+  }
+  onFormSubmit();
+}
+
+// ============================================================
+// MATCHING BOARD
+// ============================================================
+function updateMfPerfOptions(){
+  const lives=gasLives.length>0?gasLives:currentWs().lives;
+  const mfLiveVal=document.getElementById('mf-live')?.value||'';
+  const mfPerf=document.getElementById('mf-perf'); if(!mfPerf) return;
+  const selPerf=mfPerf.value;
+  const live=lives.find(l=>l.name===mfLiveVal);
+  mfPerf.innerHTML='<option value="">全公演</option>'+
+    (live?live.performances:[]).map(p=>`<option value="${esc(p.name)}"${p.name===selPerf?'selected':''}>${esc(p.name)}</option>`).join('');
+}
+function populateMatchingFormSelects(){
+  const ws=currentWs();
+  const lives=gasLives.length>0?gasLives:ws.lives;
+  const dl=document.getElementById('member-names-list');
+  if(dl){
+    const names=[...new Set(ws.members.map(m=>m.name))];
+    dl.innerHTML=names.map(n=>`<option value="${esc(n)}">`).join('');
+  }
+  const ml=document.getElementById('m-live'); if(!ml) return;
+  const selLive=ml.value;
+  ml.innerHTML='<option value="">-- ライブ --</option>'+
+    lives.map(l=>`<option value="${esc(l.name)}"${l.name===selLive?'selected':''}>${esc(l.name)}</option>`).join('');
+  updateMatchPerfSelect();
+  buildMatchSeatBtns(document.getElementById('m-seat')?.value||'一般');
+  const mfLive=document.getElementById('mf-live');
+  if(mfLive){
+    const sel=mfLive.value;
+    mfLive.innerHTML='<option value="">全ライブ</option>'+
+      lives.map(l=>`<option value="${esc(l.name)}"${l.name===sel?'selected':''}>${esc(l.name)}</option>`).join('');
+  }
+  updateMfPerfOptions();
+}
+function updateMatchPerfSelect(){
+  const lives=gasLives.length>0?gasLives:currentWs().lives;
+  const type=document.getElementById('m-type')?.value||'give';
+  const isWant=type==='want';
+  const liveName=document.getElementById('m-live')?.value;
+  const mp=document.getElementById('m-perf'); if(!mp) return;
+  const selPerf=mp.value;
+  const live=lives.find(l=>l.name===liveName);
+  const firstOpt=isWant
+    ? `<option value="">指定なし（全公演対象）</option>`
+    : `<option value="">-- 公演 --</option>`;
+  mp.innerHTML=firstOpt+
+    (live?live.performances:[]).map(p=>{
+      const ds=fmtPerfDate(p);
+      return `<option value="${esc(p.name)}"${p.name===selPerf?'selected':''}>${esc(p.name)}${ds?' ('+ds+')':''}</option>`;
+    }).join('');
+  applyLiveGuide();
+}
+function applyLiveGuide(){
+  const lives=gasLives.length>0?gasLives:currentWs().lives;
+  const liveVal=document.getElementById('m-live')?.value||'';
+  const live=lives.find(l=>l.name===liveVal);
+  const guide=live?.guide||'lawson';
+  const inp=document.getElementById('m-guide'); if(inp) inp.value=guide;
+  const labelEl=document.getElementById('m-guide-label'); if(!labelEl) return;
+  if(!liveVal){
+    labelEl.textContent='ライブを選択すると自動設定されます';
+    labelEl.className='text-xs text-slate-500 italic';
+  } else {
+    labelEl.textContent=MATCH_GUIDE[guide]||guide;
+    labelEl.className='text-xs font-semibold text-rose-300';
+  }
+}
+function buildMatchSeatBtns(cur='一般'){
+  const container=document.getElementById('m-seat-btns'); if(!container) return;
+  const type=document.getElementById('m-type')?.value||'give';
+  const isWant=type==='want';
+  if(cur==='any'&&!isWant) cur='一般';
+  document.getElementById('m-seat').value=cur;
+  let html=SEAT_TYPES.map(s=>`
+    <button type="button" onclick="selectMatchSeat('${s}')" data-mseat="${s}"
+      class="seat-btn px-3 py-2 text-xs font-bold rounded-lg border border-slate-600 text-slate-300 bg-slate-800${cur===s?' active-'+SEAT_CLS[s]:''}">
+      ${esc(s)}
+    </button>
+  `).join('');
+  if(isWant){
+    html+=`<button type="button" onclick="selectMatchSeat('any')" data-mseat="any"
+      class="seat-btn px-3 py-2 text-xs font-bold rounded-lg border border-slate-600 text-slate-300 bg-slate-800 italic${cur==='any'?' active-any':''}">
+      指定なし
+    </button>`;
+  }
+  container.innerHTML=html;
+}
+function selectMatchSeat(s){
+  const type=document.getElementById('m-type')?.value||'give';
+  if(s==='any'&&type==='give') return;
+  document.getElementById('m-seat').value=s;
+  document.querySelectorAll('[data-mseat]').forEach(btn=>{
+    const bs=btn.dataset.mseat;
+    const activeCls=bs==='any'?'active-any':('active-'+SEAT_CLS[bs]);
+    btn.className=`seat-btn px-3 py-2 text-xs font-bold rounded-lg border border-slate-600 text-slate-300 bg-slate-800${bs===s?' '+activeCls:''}${bs==='any'?' italic':''}`;
+  });
+}
+function setMatchType(type){
+  document.getElementById('m-type').value=type;
+  document.querySelectorAll('[data-match-type]').forEach(btn=>{
+    btn.classList.remove('active-give','active-want');
+    if(btn.dataset.matchType===type) btn.classList.add('active-'+type);
+  });
+  onMatchTypeChange(type);
+}
+function onMatchTypeChange(type){
+  const isWant = type === 'want';
+  // こだわらない ボタン表示制御（先行種別 + 取引条件）
+  ['m-priority-any-btn','m-price-any-btn','m-transfer-any-btn','m-settlement-any-btn'].forEach(id=>{
+    const btn=document.getElementById(id); if(btn) btn.classList.toggle('hidden',!isWant);
+  });
+  if(!isWant){
+    // 「譲」へ切替: 曖昧値をリセット
+    const curSeat=document.getElementById('m-seat')?.value;
+    if(curSeat==='any') buildMatchSeatBtns('一般'); else buildMatchSeatBtns(curSeat||'一般');
+    const curPri=document.getElementById('m-priority')?.value;
+    if(curPri==='any'){ selectMatchTag('mg-priority','first'); document.getElementById('m-priority-other-wrap')?.classList.add('hidden'); }
+    if(document.getElementById('m-price')?.value==='any')      selectMatchTag('mg-price','consult');
+    if(document.getElementById('m-transfer')?.value==='any')   selectMatchTag('mg-transfer','app');
+    if(document.getElementById('m-settlement')?.value==='any') selectMatchTag('mg-settlement','prepay');
+  } else {
+    // 「求」へ切替: 席種ボタン再構築 + 受渡/精算をデフォルト要相談に
+    buildMatchSeatBtns(document.getElementById('m-seat')?.value||'一般');
+    selectMatchTag('mg-transfer','consult');
+    selectMatchTag('mg-settlement','consult');
+  }
+  updateMatchPerfSelect();
+}
+function adjustCount(delta){
+  matchCount=Math.max(1,Math.min(8,matchCount+delta));
+  const disp=document.getElementById('m-count-display');
+  const inp=document.getElementById('m-count');
+  if(disp) disp.textContent=matchCount;
+  if(inp) inp.value=matchCount;
+}
+// ---- tag toggle helper ----
+function selectMatchTag(groupId, val){
+  const container=document.getElementById(groupId); if(!container) return;
+  const input=container.querySelector('input[type="hidden"]');
+  if(input) input.value=val;
+  container.querySelectorAll('[data-val]').forEach(btn=>{
+    btn.classList.remove('active-green','active-amber','active-slate','active-blue','active-rose','active-purple','active-cyan');
+    if(btn.dataset.val===val && btn.dataset.active) btn.classList.add(btn.dataset.active);
+  });
+}
+function onPriorityChange(val){
+  selectMatchTag('mg-priority',val);
+  const wrap=document.getElementById('m-priority-other-wrap');
+  if(wrap) wrap.classList.toggle('hidden',val!=='other');
+  if(val!=='other'){ const inp=document.getElementById('m-priority-other'); if(inp) inp.value=''; }
+}
+async function cycleMatchStatus(id){
+  const entry=gasBoard.find(e=>e.id===id); if(!entry) return;
+  const order=['open','negotiating','done'];
+  const cur=entry.status||'open';
+  const next=order[(order.indexOf(cur)+1)%order.length];
+  entry.status=next;
+  renderMatchingBoard();
+  toast(`ステータスを「${MATCH_STATUS[next]}」に変更しました`,'info');
+  const result=await postToGas({action:'updateMatchStatus',id,status:next});
+  if(result&&!result.success&&!result.local){ entry.status=cur; renderMatchingBoard(); toast('ステータス更新に失敗しました','error'); }
+}
+function startMatchEdit(id){
+  const e=gasBoard.find(x=>x.id===id); if(!e) return;
+  editingMatchId=id;
+  // Live を先にセットして updateMatchPerfSelect が正しく動くようにする
+  const liveEl=document.getElementById('m-live');
+  if(liveEl) liveEl.value=e.live||'';
+  // タイプ切替 (→ onMatchTypeChange → updateMatchPerfSelect)
+  setMatchType(e.type||'give');
+  // 公演を選択
+  setTimeout(()=>{ const perfEl=document.getElementById('m-perf'); if(perfEl) perfEl.value=e.performance||''; },0);
+  // 席種
+  buildMatchSeatBtns(e.seatType||'一般');
+  // 枚数
+  matchCount=e.count||1;
+  const disp=document.getElementById('m-count-display'), cinp=document.getElementById('m-count');
+  if(disp) disp.textContent=matchCount; if(cinp) cinp.value=matchCount;
+  // タググループ（onMatchTypeChange のデフォルトを上書き）
+  selectMatchTag('mg-status',e.status||'open');
+  selectMatchTag('mg-fc',e.fc||'general');
+  onPriorityChange(e.priority||'first');
+  const poEl=document.getElementById('m-priority-other');
+  if(poEl) poEl.value=e.priorityOther||'';
+  if(e.priority==='other'){ const pw=document.getElementById('m-priority-other-wrap'); if(pw) pw.classList.remove('hidden'); }
+  selectMatchTag('mg-price',e.price||'consult');
+  selectMatchTag('mg-transfer',e.transfer||'app');
+  selectMatchTag('mg-settlement',e.settlement||'prepay');
+  // テキスト
+  const contactEl=document.getElementById('m-contact'); if(contactEl) contactEl.value=e.contact||'';
+  const noteEl=document.getElementById('m-note'); if(noteEl) noteEl.value=e.note||'';
+  // お名前
+  const nameEl=document.getElementById('m-name'); if(nameEl) nameEl.value=e.name||'';
+  // フォームボタン更新
+  const btn=document.getElementById('m-submit-btn');
+  if(btn) btn.className='flex-1 bg-amber-600 hover:bg-amber-500 text-white py-3.5 rounded-xl transition font-bold text-base flex items-center justify-center gap-2';
+  const icon=document.getElementById('m-submit-icon'); if(icon) icon.className='fa-solid fa-floppy-disk';
+  const lbl=document.getElementById('m-submit-label'); if(lbl) lbl.textContent='更新する';
+  const cancelBtn=document.getElementById('m-cancel-btn'); if(cancelBtn) cancelBtn.classList.remove('hidden');
+  document.getElementById('match-edit-bar')?.classList.remove('hidden');
+  document.getElementById('match-form-section')?.scrollIntoView({behavior:'smooth',block:'start'});
+}
+function cancelMatchEdit(){
+  editingMatchId=null;
+  const nameEl=document.getElementById('m-name'); if(nameEl) nameEl.value='';
+  const contactEl=document.getElementById('m-contact'); if(contactEl) contactEl.value='';
+  const noteEl=document.getElementById('m-note'); if(noteEl) noteEl.value='';
+  matchCount=1;
+  const disp=document.getElementById('m-count-display'), cinp=document.getElementById('m-count');
+  if(disp) disp.textContent='1'; if(cinp) cinp.value='1';
+  setMatchType('give');
+  selectMatchTag('mg-status','open');
+  selectMatchTag('mg-fc','general');
+  onPriorityChange('first');
+  selectMatchTag('mg-price','consult');
+  selectMatchTag('mg-transfer','app');
+  selectMatchTag('mg-settlement','prepay');
+  buildMatchSeatBtns('一般');
+  updateMatchPerfSelect();
+  const btn=document.getElementById('m-submit-btn');
+  if(btn) btn.className='flex-1 bg-indigo-600 hover:bg-indigo-500 text-white py-3.5 rounded-xl transition font-bold text-base flex items-center justify-center gap-2';
+  const icon=document.getElementById('m-submit-icon'); if(icon) icon.className='fa-solid fa-plus';
+  const lbl=document.getElementById('m-submit-label'); if(lbl) lbl.textContent='登録する';
+  const cancelBtn=document.getElementById('m-cancel-btn'); if(cancelBtn) cancelBtn.classList.add('hidden');
+  document.getElementById('match-edit-bar')?.classList.add('hidden');
+}
+
+async function addMatchingEntry(){
+  const nameEl=document.getElementById('m-name');
+  const name=nameEl?.value.trim();
+  if(!name){ _shake(nameEl); toast('お名前を入力してください','error'); return; }
+  const _type=document.getElementById('m-type').value||'give';
+  if(_type==='give'){
+    const _live=document.getElementById('m-live').value;
+    const _perf=document.getElementById('m-perf').value;
+    const _seat=document.getElementById('m-seat').value;
+    const _pri=document.getElementById('m-priority')?.value;
+    if(!_live){ _shake(document.getElementById('m-live')); toast('「譲」の場合はライブを選択してください','error'); return; }
+    if(!_perf){ _shake(document.getElementById('m-perf')); toast('「譲」の場合は公演を選択してください','error'); return; }
+    if(!_seat||_seat==='any'){ _shake(document.getElementById('m-seat-btns')); toast('「譲」の場合は席種を選択してください','error'); return; }
+    if(_pri==='any'){ _shake(document.getElementById('mg-priority')); toast('「譲」の場合は先行種別を選択してください','error'); return; }
+    const _price=document.getElementById('m-price')?.value;
+    const _transfer=document.getElementById('m-transfer')?.value;
+    const _settlement=document.getElementById('m-settlement')?.value;
+    if(_price==='any'){      _shake(document.getElementById('mg-price'));      toast('「譲」の場合は金額条件を選択してください','error');      return; }
+    if(_transfer==='any'){   _shake(document.getElementById('mg-transfer'));   toast('「譲」の場合は受け渡し方法を選択してください','error');   return; }
+    if(_settlement==='any'){ _shake(document.getElementById('mg-settlement')); toast('「譲」の場合は精算方法を選択してください','error'); return; }
+  }
+  const entryData={
+    type:document.getElementById('m-type').value||'give',
+    name,
+    live:document.getElementById('m-live').value,
+    performance:document.getElementById('m-perf').value,
+    seatType:document.getElementById('m-seat').value||'一般',
+    count:parseInt(document.getElementById('m-count').value)||1,
+    status:document.getElementById('m-status')?.value||'open',
+    fc:document.getElementById('m-fc')?.value||'general',
+    priority:document.getElementById('m-priority')?.value||'first',
+    priorityOther:document.getElementById('m-priority-other')?.value.trim()||'',
+    price:document.getElementById('m-price')?.value||'consult',
+    transfer:document.getElementById('m-transfer')?.value||'app',
+    guide:document.getElementById('m-guide')?.value||'lawson',
+    settlement:document.getElementById('m-settlement')?.value||'prepay',
+    contact:document.getElementById('m-contact')?.value.trim()||'',
+    note:document.getElementById('m-note').value.trim(),
+  };
+  if(editingMatchId){
+    const idx=gasBoard.findIndex(e=>e.id===editingMatchId);
+    if(idx>=0){
+      const prev={...gasBoard[idx]};
+      const updated={...gasBoard[idx],...entryData};
+      gasBoard[idx]=updated;
+      cancelMatchEdit(); renderMatchingBoard();
+      toast(`${name} のエントリーを更新しました`);
+      const result=await postToGas({action:'updateMatch',entry:updated});
+      if(!result||(!result.success&&!result.local)){ gasBoard[idx]=prev; renderMatchingBoard(); toast('更新に失敗しました','error'); }
+    }
+    return;
+  }
+  const entry={id:genId('match'),...entryData,addedAt:Date.now()};
+  gasBoard.push(entry);
+  nameEl.value='';
+  document.getElementById('m-note').value='';
+  const contactEl=document.getElementById('m-contact'); if(contactEl) contactEl.value='';
+  matchCount=1;
+  const disp=document.getElementById('m-count-display'), inp=document.getElementById('m-count');
+  if(disp) disp.textContent='1'; if(inp) inp.value='1';
+  selectMatchTag('mg-status','open');
+  selectMatchTag('mg-fc','general');
+  selectMatchTag('mg-priority','first');
+  selectMatchTag('mg-price','consult');
+  selectMatchTag('mg-transfer','app');
+  selectMatchTag('mg-settlement','prepay');
+  const poEl=document.getElementById('m-priority-other'); if(poEl) poEl.value='';
+  const powEl=document.getElementById('m-priority-other-wrap'); if(powEl) powEl.classList.add('hidden');
+  buildMatchSeatBtns('一般');
+  updateMatchPerfSelect();
+  renderMatchingBoard();
+  toast(`${name} の${entry.type==='give'?'譲':'求'}チケットを登録しました`);
+  const result=await postToGas({action:'addMatch',entry});
+  if(!result||(!result.success&&!result.local)){ gasBoard=gasBoard.filter(e=>e.id!==entry.id); renderMatchingBoard(); toast('登録に失敗しました','error'); }
+}
+async function deleteMatchingEntry(id){
+  const entry=gasBoard.find(e=>e.id===id); if(!entry) return;
+  if(!confirm(`「${entry.name}」のエントリーを削除しますか？`)) return;
+  const prev=[...gasBoard];
+  gasBoard=gasBoard.filter(e=>e.id!==id);
+  renderMatchingBoard();
+  toast('エントリーを削除しました','info');
+  const result=await postToGas({action:'deleteMatch',id});
+  if(!result||(!result.success&&!result.local)){ gasBoard=prev; renderMatchingBoard(); toast('削除に失敗しました','error'); }
+}
+function setMatchFilter(type){
+  matchTypeFilter=type;
+  ['all','give','want'].forEach(t=>{
+    const btn=document.getElementById('mf-'+t);
+    if(btn) btn.classList.toggle('active',t===type);
+  });
+  renderMatchingBoard();
+}
+function renderMatchingBoard(){
+  const ws=currentWs();
+  const board=gasBoard;
+  const liveSel=document.getElementById('mf-live')?.value||'';
+  const perfSel=document.getElementById('mf-perf')?.value||'';
+  const hideDone=document.getElementById('mf-hide-done')?.checked||false;
+  let filtered=board;
+  if(matchTypeFilter!=='all') filtered=filtered.filter(e=>e.type===matchTypeFilter);
+  if(liveSel) filtered=filtered.filter(e=>e.live===liveSel);
+  if(perfSel) filtered=filtered.filter(e=>e.performance===perfSel);
+  if(hideDone) filtered=filtered.filter(e=>(e.status||'open')!=='done');
+  filtered=[...filtered].sort((a,b)=>((a.status||'open')==='done'?1:0)-((b.status||'open')==='done'?1:0));
+
+  const container=document.getElementById('matching-list');
+  const emptyEl=document.getElementById('matching-empty');
+  if(!container) return;
+
+  if(filtered.length===0){
+    container.innerHTML='';
+    if(emptyEl){
+      const hasEntries=board.length>0;
+      const isFiltered=matchTypeFilter!=='all'||!!liveSel||!!perfSel||hideDone;
+      emptyEl.querySelector('span.empty-msg').textContent=
+        (hasEntries&&isFiltered)?'条件に一致するエントリーがありません':'マッチング情報がありません';
+      emptyEl.classList.remove('hidden');
+    }
+    return;
+  }
+  if(emptyEl) emptyEl.classList.add('hidden');
+
+  container.innerHTML=filtered.map(e=>{
+    const isGive=e.type==='give';
+    const typeIcon=isGive?'fa-right-from-bracket':'fa-right-to-bracket';
+    const typeLabel=isGive?'譲':'求';
+    const badgeCls=isGive?'match-give-badge':'match-want-badge';
+    const accentBg=isGive?'bg-emerald-500':'bg-orange-500';
+    const countCol=isGive?'text-emerald-400':'text-orange-400';
+    const cardBorder=isGive?'match-card-give':'match-card-want';
+    const seatIsAny=e.seatType==='any';
+    const seatCls=seatIsAny?'':(SEAT_CLS[e.seatType||'一般']||'ippan');
+    const seatBadgeHtml=seatIsAny
+      ?`<span class="seat-any-badge px-2 py-0.5 rounded text-xs font-bold italic">どこでも可</span>`
+      :`<span class="sb-${seatCls} px-2 py-0.5 rounded text-xs font-bold">${esc(e.seatType||'一般')}</span>`;
+    const wantAnyPerf=(!e.performance&&e.type==='want');
+    const perfBadgeHtml=wantAnyPerf
+      ?`<span class="flex-badge">全公演対象</span>`
+      :(e.performance?`<span class="perf-badge px-1.5 py-0.5 rounded text-xs">${esc(e.performance)}</span>`:'');
+    const status=e.status||'open';
+    const statusLabel=MATCH_STATUS[status]||'募集中';
+    const isDone=status==='done';
+    const opacity=isDone?'opacity-50':'';
+    // info tags
+    const fc=MATCH_FC[e.fc]||'';
+    const priority=e.priority==='any'?'こだわらない':(e.priority==='other'?(e.priorityOther||'その他'):(MATCH_PRIORITY[e.priority]||''));
+    const price=MATCH_PRICE[e.price]||'';
+    const transfer=MATCH_TRANSFER[e.transfer]||'';
+    const guide=MATCH_GUIDE[e.guide]||'';
+    const settlement=MATCH_SETTLEMENT[e.settlement]||'';
+    const contact=e.contact||'';
+    const xMatch=contact?contact.match(/^@([A-Za-z0-9_]+)$/):null;
+    const contactInner=xMatch
+      ?`<a href="https://x.com/${xMatch[1]}" target="_blank" rel="noopener noreferrer" class="font-mono text-indigo-400 hover:text-indigo-300 hover:underline transition">${esc(contact)}</a>`
+      :`<span class="font-mono text-slate-400">${esc(contact)}</span>`;
+    const contactHtml=contact?`<div class="flex items-center gap-1.5 mb-1.5 text-xs"><i class="fa-solid fa-at text-indigo-400 text-xs"></i>${contactInner}</div>`:'';
+    return `<div class="bg-slate-900 border ${cardBorder} rounded-xl overflow-hidden ${opacity} transition-opacity">
+      <div class="h-1.5 ${accentBg}"></div>
+      <div class="p-4">
+        <!-- Header row -->
+        <div class="flex items-start justify-between gap-2 mb-2.5">
+          <div class="flex items-center gap-2 min-w-0">
+            <span class="${badgeCls} text-xs px-2 py-0.5 rounded font-bold flex-shrink-0 flex items-center gap-1">
+              <i class="fa-solid ${typeIcon} text-xs"></i>${typeLabel}
+            </span>
+            <span class="font-bold text-slate-100 text-base truncate">${esc(e.name)}</span>
+          </div>
+          <div class="flex flex-col items-end gap-1 flex-shrink-0">
+            <span class="text-2xl font-black ${countCol} leading-none">x${e.count}</span>
+            <button onclick="cycleMatchStatus('${esc(e.id)}')" title="タップでステータス変更"
+              class="status-${status} text-xs px-2 py-0.5 rounded-lg font-semibold cursor-pointer hover:opacity-75 transition flex items-center gap-1">
+              ${statusLabel}
+            </button>
+          </div>
+        </div>
+        <!-- Live/Perf/Seat -->
+        <div class="flex flex-wrap gap-1.5 mb-2">
+          ${e.live?`<span class="live-badge px-1.5 py-0.5 rounded text-xs" style="${liveBadgeStyle(e.live)}">${esc(e.live)}</span>`:''}
+          ${perfBadgeHtml}
+          ${seatBadgeHtml}
+        </div>
+        <!-- Ticket info tags -->
+        ${(fc||priority||guide)?`
+        <div class="flex flex-wrap gap-1 mb-1.5">
+          ${fc?`<span class="info-tag info-tag-ticket"><i class="fa-solid fa-ticket" style="font-size:.55rem;opacity:.8"></i> 枠: ${esc(fc)}</span>`:''}
+          ${priority?`<span class="${priority==='こだわらない'?'flex-badge':'info-tag info-tag-ticket'}" style="${priority==='こだわらない'?'':''}"><i class="fa-solid fa-list-ol" style="font-size:.55rem;opacity:.8"></i> 先行: ${esc(priority)}</span>`:''}
+          ${guide?`<span class="info-tag info-tag-ticket"><i class="fa-solid fa-mobile-screen" style="font-size:.55rem;opacity:.8"></i> PG: ${esc(guide)}</span>`:''}
+        </div>`:''}
+        <!-- Trade condition tags -->
+        ${(price||transfer||settlement)?`
+        <div class="flex flex-wrap gap-1 mb-2">
+          ${price?`<span class="${e.price==='any'?'flex-badge':'info-tag info-tag-trade'}"><i class="fa-solid fa-yen-sign" style="font-size:.55rem;opacity:.8"></i> 金額: ${esc(price)}</span>`:''}
+          ${transfer?`<span class="${e.transfer==='any'?'flex-badge':'info-tag info-tag-trade'}"><i class="fa-solid fa-handshake" style="font-size:.55rem;opacity:.8"></i> 受渡: ${esc(transfer)}</span>`:''}
+          ${settlement?`<span class="${e.settlement==='any'?'flex-badge':'info-tag info-tag-trade'}"><i class="fa-solid fa-wallet" style="font-size:.55rem;opacity:.8"></i> 精算: ${esc(settlement)}</span>`:''}
+        </div>`:''}
+        ${contactHtml}
+        ${e.note?`<p class="text-xs text-slate-400 bg-slate-800/50 rounded-lg px-2.5 py-1.5 mb-2 leading-relaxed">${esc(e.note)}</p>`:''}
+        <div class="flex items-center justify-between pt-2 border-t border-slate-800/50">
+          <span class="text-xs text-slate-600">${new Date(e.addedAt).toLocaleDateString('ja')}</span>
+          <div class="flex items-center gap-1">
+            <button onclick="startMatchEdit('${esc(e.id)}')"
+              class="text-slate-500 hover:text-indigo-400 transition text-xs px-2 py-1 rounded hover:bg-slate-700 flex items-center gap-1">
+              <i class="fa-solid fa-pen text-xs"></i> 編集
+            </button>
+            <button onclick="deleteMatchingEntry('${esc(e.id)}')"
+              class="text-slate-500 hover:text-red-400 transition text-xs px-2 py-1 rounded hover:bg-slate-700 flex items-center gap-1">
+              <i class="fa-solid fa-trash text-xs"></i> 削除
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+function copyMatchingSummary(){
+  const ws=currentWs();
+  const board=gasBoard;
+  if(!board.length){ toast('マッチング情報がありません','error'); return; }
+  const lines=[`【マッチングボード】${ws.name}`,''];
+  const lives=[...new Set(board.map(e=>e.live||''))];
+  lives.forEach(live=>{
+    const group=board.filter(e=>(e.live||'')===live);
+    if(live) lines.push(`■ ${live}`);
+    const gives=group.filter(e=>e.type==='give');
+    const wants=group.filter(e=>e.type==='want');
+    const fmtEntry=e=>{
+      const seatStr=e.seatType==='any'?'席種問わず':(e.seatType||'一般');
+      const perfStr=e.performance||(e.type==='want'?'全公演対象':'');
+      let row=`・${e.name}: ${seatStr}${perfStr?' '+perfStr:''} x${e.count}`;
+      const priStr=e.priority==='any'?'こだわらない':(e.priority==='other'?(e.priorityOther||'その他'):MATCH_PRIORITY[e.priority]);
+      const ticket=[MATCH_FC[e.fc], priStr, MATCH_GUIDE[e.guide]].filter(Boolean);
+      const trade=[MATCH_PRICE[e.price], MATCH_TRANSFER[e.transfer], MATCH_SETTLEMENT[e.settlement]].filter(Boolean);
+      if(ticket.length) row+=` [${ticket.join('/')}]`;
+      if(trade.length)  row+=` [${trade.join('/')}]`;
+      if(e.contact) row+=` 連絡先:${e.contact}`;
+      if(e.note) row+=` (${e.note})`;
+      const st=MATCH_STATUS[e.status||'open'];
+      if(e.status&&e.status!=='open') row+=` <${st}>`;
+      return row;
+    };
+    if(gives.length){ lines.push('[譲]'); gives.forEach(e=>lines.push(fmtEntry(e))); }
+    if(wants.length){ lines.push('[求]'); wants.forEach(e=>lines.push(fmtEntry(e))); }
+    lines.push('');
+  });
+  navigator.clipboard.writeText(lines.join('\n').trimEnd())
+    .then(()=>toast('マッチングサマリーをコピーしました'))
+    .catch(()=>toast('コピーに失敗しました','error'));
+}
+
+// ============================================================
+// GAS 通信
+// ============================================================
+async function fetchFromGas(){
+  if(!GAS_URL||GAS_URL==='YOUR_GAS_WEB_APP_URL'){
+    // URL未設定時はローカルデータで代用（開発・テスト用）
+    const ws=currentWs();
+    gasLives=[...ws.lives];
+    gasBoard=[...(ws.matchingBoard||[])];
+    populateMatchingFormSelects();
+    renderMatchingBoard();
+    return;
+  }
+  setMatchLoading(true);
+  try {
+    const res=await fetch(GAS_URL+'?t='+Date.now());
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    const data=await res.json();
+    gasLives=data.lives||[];
+    gasBoard=data.matching||[];
+    populateMatchingFormSelects();
+    renderMatchingBoard();
+  } catch(err){
+    toast('データの取得に失敗しました: '+err.message,'error');
+  } finally {
+    setMatchLoading(false);
+  }
+}
+
+async function postToGas(payload){
+  if(!GAS_URL||GAS_URL==='YOUR_GAS_WEB_APP_URL') return {success:true,local:true};
+  try {
+    const url=GAS_URL+'?payload='+encodeURIComponent(JSON.stringify(payload))+'&t='+Date.now();
+    const res=await fetch(url);
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    return await res.json();
+  } catch(err){
+    toast('通信エラー: '+err.message,'error');
+    return null;
+  }
+}
+
+function setMatchLoading(on){
+  const el=document.getElementById('match-loading');
+  if(el) el.classList.toggle('hidden',!on);
+}
+
+// ============================================================
+// EVENTS
+// ============================================================
+function bindEvents(){
+  document.getElementById('ws-switcher').addEventListener('click',openWsModal);
+  document.getElementById('ws-modal').addEventListener('click',e=>{ if(e.target===document.getElementById('ws-modal')) closeWsModal(); });
+  document.getElementById('new-ws-name').addEventListener('keydown',e=>{ if(e.key==='Enter') createWorkspace(); });
+
+  document.getElementById('settings-btn').addEventListener('click',openSettings);
+  document.getElementById('settings-modal').addEventListener('click',e=>{ if(e.target===document.getElementById('settings-modal')) triggerSettingsShake(); });
+
+  document.getElementById('f-live').addEventListener('change',updatePerfSelect);
+  document.getElementById('form-submit-btn').addEventListener('click',onFormSubmit);
+  document.getElementById('form-cancel-btn').addEventListener('click',cancelEdit);
+  document.addEventListener('keydown',e=>{ if(e.key==='Escape'&&document.getElementById('f-edit-id').value) cancelEdit(); });
+
+  document.getElementById('select-all').addEventListener('change',e=>toggleSelectAll(e.target.checked));
+  document.addEventListener('change',e=>{ if(e.target.classList.contains('row-check')) toggleSelect(e.target.dataset.id,e.target.checked); });
+
+  document.getElementById('filter-name')?.addEventListener('input',()=>renderMemberList());
+  document.getElementById('filter-live').addEventListener('change',()=>{ renderFilterOptions(); renderMemberList(); renderStatsCards(); });
+  document.getElementById('filter-perf').addEventListener('change',()=>{ renderMemberList(); renderStatsCards(); });
+  document.getElementById('filter-result').addEventListener('change',()=>renderMemberList());
+  document.getElementById('sort-by').addEventListener('change',()=>renderMemberList());
+
+  ['sum-lost','sum-pending','sum-seat','sum-stats'].forEach(id=>
+    document.getElementById(id).addEventListener('change',updateSummary));
+  document.getElementById('copy-summary-btn').addEventListener('click',copyText);
+
+  document.getElementById('export-csv-btn').addEventListener('click',exportCSV);
+  document.getElementById('export-json-btn').addEventListener('click',exportJSON);
+  document.getElementById('import-btn').addEventListener('click',triggerImport);
+  document.getElementById('import-file-input').addEventListener('change',handleImportFile);
+
+  document.getElementById('m-live')?.addEventListener('change',updateMatchPerfSelect);
+  document.getElementById('mf-live')?.addEventListener('change',()=>{ updateMfPerfOptions(); renderMatchingBoard(); });
+  document.getElementById('mf-perf')?.addEventListener('change',renderMatchingBoard);
+  document.getElementById('mf-hide-done')?.addEventListener('change',renderMatchingBoard);
+
+  document.addEventListener('click',e=>{
+    const editId=document.getElementById('f-edit-id').value; if(!editId) return;
+    const formSec=document.getElementById('form-section');
+    const editBarEl=document.getElementById('edit-bar');
+    const discardEl=document.getElementById('discard-modal');
+    if(formSec.contains(e.target)||editBarEl.contains(e.target)||discardEl.contains(e.target)) return;
+    triggerShake();
+  });
+  document.addEventListener('click',e=>{
+    if(!editingMatchId) return;
+    const formEl=document.getElementById('match-form-section');
+    const barEl=document.getElementById('match-edit-bar');
+    if(formEl?.contains(e.target)||barEl?.contains(e.target)) return;
+    _shake(document.getElementById('match-edit-bar-inner'));
+  });
+
+  window.addEventListener('beforeunload',e=>{
+    if(document.getElementById('f-edit-id').value){ e.preventDefault(); e.returnValue='編集中の変更が保存されていません。'; }
+  });
+}
+
+// ============================================================
+// INIT
+// ============================================================
+loadState();
+bindEvents();
+buildResultBtns('pending');
+renderAll();
+if(currentTab==='matching') fetchFromGas();
+</script>
+</body>
+</html>
