@@ -175,13 +175,19 @@ select option { background:#1e293b; color:#f1f5f9; }
         <i class="fa-solid fa-plus"></i> ライブを追加
       </button>
     </div>
-    <div class="px-5 py-4 border-t border-slate-800 flex justify-end gap-2 flex-shrink-0">
-      <button onclick="confirmCloseSettings()"
-        class="bg-slate-700 hover:bg-slate-600 text-slate-300 text-sm px-4 py-2 rounded-lg transition">キャンセル</button>
-      <button onclick="saveSettings()"
-        class="bg-indigo-600 hover:bg-indigo-500 text-white text-sm px-5 py-2 rounded-lg transition font-semibold">
-        <i class="fa-solid fa-floppy-disk mr-1"></i>保存
+    <div class="px-5 py-4 border-t border-slate-800 flex justify-between items-center gap-2 flex-shrink-0">
+      <button onclick="migrateLocalToGas()"
+        class="bg-slate-700 hover:bg-amber-600 text-slate-300 hover:text-white text-sm px-3 py-2 rounded-lg transition" title="ローカルデータをGASに手動移行">
+        <i class="fa-solid fa-cloud-arrow-up mr-1"></i>GASに移行
       </button>
+      <div class="flex gap-2">
+        <button onclick="confirmCloseSettings()"
+          class="bg-slate-700 hover:bg-slate-600 text-slate-300 text-sm px-4 py-2 rounded-lg transition">キャンセル</button>
+        <button onclick="saveSettings()"
+          class="bg-indigo-600 hover:bg-indigo-500 text-white text-sm px-5 py-2 rounded-lg transition font-semibold">
+          <i class="fa-solid fa-floppy-disk mr-1"></i>保存
+        </button>
+      </div>
     </div>
   </div>
 </div>
@@ -2143,6 +2149,27 @@ function copyMatchingSummary(){
 // ============================================================
 // GAS 通信
 // ============================================================
+async function migrateLocalToGas(){
+  if(!GAS_URL||GAS_URL==='YOUR_GAS_WEB_APP_URL'){ toast('GAS URLが設定されていません','error'); return; }
+  if(!confirm('このデバイスのローカルデータ（ライブ設定・掲示板エントリー）をGASに上書き移行します。\nよろしいですか？')) return;
+  const ws=currentWs();
+  const localLives=ws.lives||[];
+  const localBoard=ws.matchingBoard||[];
+  let count=0;
+  if(localLives.length>0){
+    const r=await postToGas({action:'syncLives',lives:localLives});
+    if(r&&r.success&&!r.local){ gasLives=[...localLives]; count+=localLives.length; }
+  }
+  if(localBoard.length>0){
+    for(const entry of localBoard){ await postToGas({action:'addMatch',entry}); count++; }
+    gasBoard=[...localBoard];
+  }
+  localStorage.setItem('gas-migrated-v1','1');
+  populateMatchingFormSelects();
+  renderMatchingBoard();
+  toast(`${count}件のデータをGASに移行しました`,'info');
+}
+
 async function fetchFromGas(){
   if(!GAS_URL||GAS_URL==='YOUR_GAS_WEB_APP_URL'){
     // URL未設定時はローカルデータで代用（開発・テスト用）
@@ -2160,6 +2187,26 @@ async function fetchFromGas(){
     const data=await res.json();
     gasLives=data.lives||[];
     gasBoard=data.matching||[];
+
+    // ローカルデータ移行（GASが空でローカルにデータがある場合、このデバイスで初回のみ実行）
+    if(!localStorage.getItem('gas-migrated-v1')){
+      const ws=currentWs();
+      const localLives=ws.lives||[];
+      const localBoard=ws.matchingBoard||[];
+      let migrated=false;
+      if(gasLives.length===0&&localLives.length>0){
+        const r=await postToGas({action:'syncLives',lives:localLives});
+        if(r&&r.success&&!r.local){gasLives=[...localLives];migrated=true;}
+      }
+      if(gasBoard.length===0&&localBoard.length>0){
+        for(const entry of localBoard){await postToGas({action:'addMatch',entry});}
+        gasBoard=[...localBoard];
+        migrated=true;
+      }
+      if(migrated) toast('ローカルデータをGASに移行しました','info');
+      localStorage.setItem('gas-migrated-v1','1');
+    }
+
     populateMatchingFormSelects();
     renderMatchingBoard();
   } catch(err){
