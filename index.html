@@ -2,7 +2,7 @@
 <html lang="ja" class="dark">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>チケット当落管理ツール</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
@@ -121,6 +121,23 @@ select option { background:#1e293b; color:#f1f5f9; }
 .trow:hover { background:rgba(30,41,59,.5); }
 .trow-editing { background:rgba(245,158,11,.07)!important; }
 .member-card:hover { background:rgba(30,41,59,.7); }
+
+/* ── iOS / Touch device optimizations ─────────────────────── */
+* { -webkit-tap-highlight-color: transparent; }
+body { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+/* Prevent iOS page-zoom on input/select focus (triggered when font-size < 16px) */
+@media (hover: none) and (pointer: coarse) {
+  input, select, textarea { font-size: max(1em, 16px) !important; }
+}
+/* Safe area insets for fixed bottom bars (iPhone X+ home indicator) */
+#edit-bar-inner { padding-bottom: max(0.75rem, env(safe-area-inset-bottom, 0px)); }
+#match-edit-bar-inner { padding-bottom: max(0.75rem, env(safe-area-inset-bottom, 0px)); }
+#bulk-bar { bottom: max(3.5rem, calc(3.5rem + env(safe-area-inset-bottom, 0px))); }
+/* Ensure scrollable content clears bottom bars + safe area */
+main { padding-bottom: max(10rem, calc(8rem + env(safe-area-inset-bottom, 0px))) !important; }
+/* Hide scrollbars on horizontal-scroll filter rows */
+.filter-scroll-row { scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+.filter-scroll-row::-webkit-scrollbar { display: none; }
 </style>
 <script>tailwind.config = { darkMode:'class' };</script>
 </head>
@@ -176,10 +193,16 @@ select option { background:#1e293b; color:#f1f5f9; }
       </button>
     </div>
     <div class="px-5 py-4 border-t border-slate-800 flex justify-between items-center gap-2 flex-shrink-0">
-      <button onclick="migrateLocalToGas()"
-        class="bg-slate-700 hover:bg-amber-600 text-slate-300 hover:text-white text-sm px-3 py-2 rounded-lg transition" title="ローカルデータをGASに手動移行">
-        <i class="fa-solid fa-cloud-arrow-up mr-1"></i>GASに移行
-      </button>
+      <div class="flex gap-2">
+        <button onclick="gasWriteTest()"
+          class="bg-slate-700 hover:bg-sky-600 text-slate-300 hover:text-white text-sm px-3 py-2 rounded-lg transition" title="GAS書き込み接続テスト">
+          <i class="fa-solid fa-plug mr-1"></i>GASテスト
+        </button>
+        <button onclick="migrateLocalToGas()"
+          class="bg-slate-700 hover:bg-amber-600 text-slate-300 hover:text-white text-sm px-3 py-2 rounded-lg transition" title="ローカルデータをGASに手動移行">
+          <i class="fa-solid fa-cloud-arrow-up mr-1"></i>GASに移行
+        </button>
+      </div>
       <div class="flex gap-2">
         <button onclick="confirmCloseSettings()"
           class="bg-slate-700 hover:bg-slate-600 text-slate-300 text-sm px-4 py-2 rounded-lg transition">キャンセル</button>
@@ -302,7 +325,7 @@ select option { background:#1e293b; color:#f1f5f9; }
 <section id="section-manager" class="pt-3">
 
   <!-- STATS -->
-  <div id="stats-cards" class="grid grid-cols-4 gap-2 mb-4"></div>
+  <div id="stats-cards" class="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4"></div>
 
   <!-- ADD/EDIT MEMBER FORM -->
   <div id="form-section" class="bg-slate-900 border border-slate-800 rounded-xl p-4 sm:p-5 mb-4">
@@ -374,36 +397,52 @@ select option { background:#1e293b; color:#f1f5f9; }
   </div>
 
   <!-- FILTER + SORT -->
-  <div class="flex flex-wrap gap-2 mb-3 items-center">
-    <div class="relative">
-      <i class="fa-solid fa-magnifying-glass absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500 text-xs pointer-events-none"></i>
-      <input id="filter-name" type="text" placeholder="名前で検索..." autocomplete="off"
-        class="bg-slate-800 border border-slate-700 rounded-lg pl-7 pr-3 py-1.5 text-sm text-slate-300 placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 w-36 sm:w-44">
+  <div class="flex flex-col gap-2 mb-3">
+    <div class="flex items-center gap-2">
+      <div class="relative flex-1 min-w-0">
+        <i class="fa-solid fa-magnifying-glass absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500 text-xs pointer-events-none"></i>
+        <input id="filter-name" type="text" placeholder="名前で検索..." autocomplete="off"
+          class="w-full bg-slate-800 border border-slate-700 rounded-lg pl-7 pr-3 py-1.5 text-sm text-slate-300 placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500">
+      </div>
+      <span id="filtered-count" class="text-xs text-slate-500 flex-shrink-0"></span>
+      <button onclick="fetchFromGas()" title="最新データに更新"
+        class="flex-shrink-0 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 text-xs px-3 py-1.5 rounded-lg transition flex items-center gap-1.5">
+        <i class="fa-solid fa-rotate-right"></i> 更新
+      </button>
     </div>
-    <select id="filter-live"
-      class="bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-slate-300 focus:outline-none focus:border-indigo-500">
-      <option value="">全ライブ</option>
-    </select>
-    <select id="filter-perf"
-      class="bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-slate-300 focus:outline-none focus:border-indigo-500">
-      <option value="">全公演</option>
-    </select>
-    <select id="filter-result"
-      class="bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-slate-300 focus:outline-none focus:border-indigo-500">
-      <option value="">全結果</option>
-      <option value="won">当選</option>
-      <option value="lost">落選</option>
-      <option value="pending">結果待ち</option>
-    </select>
-    <select id="sort-by"
-      class="bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-slate-300 focus:outline-none focus:border-indigo-500 ml-auto">
-      <option value="custom">追加順</option>
-      <option value="name">名前順</option>
-      <option value="live">ライブ順</option>
-      <option value="result">結果順</option>
-      <option value="seat">座席順</option>
-    </select>
-    <span id="filtered-count" class="text-xs text-slate-500"></span>
+    <div class="flex gap-2 items-center overflow-x-auto filter-scroll-row">
+      <select id="sort-by"
+        class="flex-shrink-0 bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-slate-300 focus:outline-none focus:border-indigo-500">
+        <option value="custom">追加順</option>
+        <option value="name">名前順</option>
+        <option value="live">ライブ順</option>
+        <option value="result">結果順</option>
+        <option value="seat">座席順</option>
+      </select>
+      <select id="filter-live"
+        class="flex-shrink-0 bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-slate-300 focus:outline-none focus:border-indigo-500">
+        <option value="">全ライブ</option>
+      </select>
+      <select id="filter-perf"
+        class="flex-shrink-0 bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-slate-300 focus:outline-none focus:border-indigo-500">
+        <option value="">全公演</option>
+      </select>
+      <select id="filter-result"
+        class="flex-shrink-0 bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-slate-300 focus:outline-none focus:border-indigo-500">
+        <option value="">全結果</option>
+        <option value="won">当選</option>
+        <option value="lost">落選</option>
+        <option value="pending">結果待ち</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- MEMBER LOADING -->
+  <div id="member-loading" class="hidden flex items-center justify-center py-10">
+    <div class="flex items-center gap-3">
+      <i class="fa-solid fa-circle-notch fa-spin text-indigo-400 text-xl"></i>
+      <span class="text-sm text-slate-400">データを読み込み中...</span>
+    </div>
   </div>
 
   <!-- MEMBER LIST -->
@@ -412,7 +451,6 @@ select option { background:#1e293b; color:#f1f5f9; }
       <table class="w-full text-sm">
         <thead>
           <tr class="border-b border-slate-800 text-slate-400 text-xs bg-slate-800/40">
-            <th class="w-8 px-2 py-2.5"></th>
             <th class="w-8 px-2 py-2.5">
               <input type="checkbox" id="select-all" class="checkbox-custom" title="全選択">
             </th>
@@ -702,37 +740,41 @@ select option { background:#1e293b; color:#f1f5f9; }
   </div>
 
   <!-- Filter bar -->
-  <div class="flex flex-wrap gap-2 mb-3 items-center">
-    <button id="mf-all" onclick="setMatchFilter('all')"
-      class="mfilter-btn active px-3 py-1.5 rounded-lg text-sm font-semibold">すべて</button>
-    <button id="mf-give" onclick="setMatchFilter('give')"
-      class="mfilter-btn px-3 py-1.5 rounded-lg text-sm font-semibold flex items-center gap-1.5">
-      <i class="fa-solid fa-circle text-emerald-400 text-xs"></i> 譲のみ
-    </button>
-    <button id="mf-want" onclick="setMatchFilter('want')"
-      class="mfilter-btn px-3 py-1.5 rounded-lg text-sm font-semibold flex items-center gap-1.5">
-      <i class="fa-regular fa-circle text-orange-400 text-xs"></i> 求のみ
-    </button>
-    <select id="mf-live"
-      class="bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-slate-300 focus:outline-none focus:border-indigo-500">
-      <option value="">全ライブ</option>
-    </select>
-    <select id="mf-perf"
-      class="bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-slate-300 focus:outline-none focus:border-indigo-500">
-      <option value="">全公演</option>
-    </select>
-    <label class="flex items-center gap-1.5 cursor-pointer text-xs text-slate-400 select-none">
-      <input type="checkbox" id="mf-hide-done" class="checkbox-custom">
-      <span>完了を隠す</span>
-    </label>
-    <button onclick="fetchFromGas()" title="最新データに更新"
-      class="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 text-xs px-3 py-1.5 rounded-lg transition flex items-center gap-1.5">
-      <i class="fa-solid fa-rotate-right"></i> 更新
-    </button>
-    <button onclick="copyMatchingSummary()"
-      class="ml-auto bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 text-xs px-3 py-1.5 rounded-lg transition flex items-center gap-1.5">
-      <i class="fa-regular fa-copy"></i> サマリーコピー
-    </button>
+  <div class="flex flex-col gap-2 mb-3">
+    <div class="flex items-center gap-2 flex-wrap">
+      <button id="mf-all" onclick="setMatchFilter('all')"
+        class="mfilter-btn active px-3 py-1.5 rounded-lg text-sm font-semibold">すべて</button>
+      <button id="mf-give" onclick="setMatchFilter('give')"
+        class="mfilter-btn px-3 py-1.5 rounded-lg text-sm font-semibold flex items-center gap-1.5">
+        <i class="fa-solid fa-circle text-emerald-400 text-xs"></i> 譲のみ
+      </button>
+      <button id="mf-want" onclick="setMatchFilter('want')"
+        class="mfilter-btn px-3 py-1.5 rounded-lg text-sm font-semibold flex items-center gap-1.5">
+        <i class="fa-regular fa-circle text-orange-400 text-xs"></i> 求のみ
+      </button>
+      <label class="flex items-center gap-1.5 cursor-pointer text-xs text-slate-400 select-none">
+        <input type="checkbox" id="mf-hide-done" class="checkbox-custom">
+        <span>完了を隠す</span>
+      </label>
+      <button onclick="fetchFromGas()" title="最新データに更新"
+        class="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 text-xs px-3 py-1.5 rounded-lg transition flex items-center gap-1.5">
+        <i class="fa-solid fa-rotate-right"></i> 更新
+      </button>
+      <button onclick="copyMatchingSummary()"
+        class="ml-auto bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 text-xs px-3 py-1.5 rounded-lg transition flex items-center gap-1.5">
+        <i class="fa-regular fa-copy"></i> サマリーコピー
+      </button>
+    </div>
+    <div class="flex gap-2 items-center overflow-x-auto filter-scroll-row">
+      <select id="mf-live"
+        class="flex-shrink-0 bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-slate-300 focus:outline-none focus:border-indigo-500">
+        <option value="">全ライブ</option>
+      </select>
+      <select id="mf-perf"
+        class="flex-shrink-0 bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-slate-300 focus:outline-none focus:border-indigo-500">
+        <option value="">全公演</option>
+      </select>
+    </div>
   </div>
 
   <!-- Loading indicator -->
@@ -842,8 +884,6 @@ let settingsDraft  = null;
 let pendingImport  = null;
 let discardTarget  = null;
 let selectedIds    = new Set();
-let memberSortable = null;
-let cardSortable   = null;
 let currentTab     = 'manager';
 let matchTypeFilter= 'all';
 let matchCount     = 1;
@@ -852,9 +892,11 @@ let editingMatchId = null;
 // ============================================================
 // GAS CONFIG  ※デプロイ後にURLを書き換えてください
 // ============================================================
-const GAS_URL = 'https://script.google.com/macros/s/AKfycbzks9aIIcS4KDTOiGUMhR7nFYc_shEZhOzqCXoS7HzLjvx1kSAgSeUa5vR1Y4zi1YZsBw/exec';
-let gasLives  = [];
-let gasBoard  = [];
+const GAS_URL  = 'https://script.google.com/macros/s/AKfycbzks9aIIcS4KDTOiGUMhR7nFYc_shEZhOzqCXoS7HzLjvx1kSAgSeUa5vR1Y4zi1YZsBw/exec';
+let gasLives   = [];
+let gasBoard   = [];
+let gasMembers = [];
+function isGasEnabled(){ return !!GAS_URL && GAS_URL !== 'YOUR_GAS_WEB_APP_URL'; }
 
 // ============================================================
 // UTILS
@@ -1195,26 +1237,28 @@ function getOption(type){
 // ============================================================
 function populateFormSelects(){
   const ws=currentWs();
+  const lives=gasLives.length>0?gasLives:ws.lives;
   const liveEl=document.getElementById('f-live');
   const selLive=liveEl.value;
   liveEl.innerHTML='<option value="">-- 選択 --</option>'+
-    ws.lives.map(l=>`<option value="${esc(l.name)}"${l.name===selLive?'selected':''}>${esc(l.name)}</option>`).join('');
+    lives.map(l=>`<option value="${esc(l.name)}"${l.name===selLive?'selected':''}>${esc(l.name)}</option>`).join('');
   updatePerfSelect();
   buildSeatBtns();
 }
 function updatePerfSelect(){
   const ws=currentWs();
+  const lives=gasLives.length>0?gasLives:ws.lives;
   const liveName=document.getElementById('f-live').value;
   const perfEl=document.getElementById('f-perf');
   const selPerf=perfEl.value;
-  const live=ws.lives.find(l=>l.name===liveName);
+  const live=lives.find(l=>l.name===liveName);
   perfEl.innerHTML='<option value="">-- 選択 --</option>'+
     (live?live.performances:[]).map(p=>{
       const ds=fmtPerfDate(p);
       return `<option value="${esc(p.name)}"${p.name===selPerf?'selected':''}>${esc(p.name)}${ds?' ('+ds+')':''}</option>`;
     }).join('');
 }
-function onFormSubmit(){
+async function onFormSubmit(){
   const name=document.getElementById('f-name').value.trim();
   if(!name){ _shake(document.getElementById('f-name')); toast('お名前を入力してください','error'); return; }
   const editId=document.getElementById('f-edit-id').value;
@@ -1229,25 +1273,40 @@ function onFormSubmit(){
     accommodation:getOption('accommodation')
   };
   if(editId){
-    const m=ws.members.find(x=>x.id===editId);
-    if(m) Object.assign(m,data);
+    const m=gasMembers.find(x=>x.id===editId);
+    if(!m) return;
+    const prev={...m};
+    Object.assign(m,data);
+    renderAll();
     toast(`${name} を更新しました`);
     _doCancelEdit();
+    if(isGasEnabled()){
+      const r=await postToGas({action:'updateMember',entry:{...m}});
+      if(!r||(!r.success&&!r.local)){ Object.assign(m,prev); renderAll(); toast('更新に失敗しました','error'); }
+    } else {
+      ws.members=[...gasMembers]; saveState();
+    }
   } else {
-    ws.members.push({id:genId('mem'),...data,addedAt:Date.now(),sortOrder:ws.members.length});
-    toast(`${name} を追加しました`);
+    const entry={id:genId('mem'),...data,addedAt:Date.now(),sortOrder:gasMembers.length};
+    gasMembers.push(entry);
     document.getElementById('f-name').value='';
     buildResultBtns('pending');
     setOption('afterparty',false);
     setOption('accommodation',false);
     document.getElementById('f-name').focus();
+    renderAll();
+    toast(`${name} を追加しました`);
+    if(isGasEnabled()){
+      const r=await postToGas({action:'addMember',entry});
+      if(!r||(!r.success&&!r.local)){ gasMembers=gasMembers.filter(x=>x.id!==entry.id); renderAll(); toast('登録に失敗しました','error'); }
+    } else {
+      ws.members=[...gasMembers]; saveState();
+    }
   }
-  saveState(); renderAll();
 }
 let _pendingEditId=null;
 function startEdit(id){
-  const ws=currentWs();
-  const m=ws.members.find(x=>x.id===id); if(!m) return;
+  const m=gasMembers.find(x=>x.id===id); if(!m) return;
   const editId=document.getElementById('f-edit-id').value;
   if(editId&&editId!==id){ discardTarget='member'; _pendingEditId=id; openDiscardModal(); return; }
   _doStartEdit(m);
@@ -1297,15 +1356,22 @@ function cancelEdit(){
 // ============================================================
 // MEMBER CRUD
 // ============================================================
-function deleteMember(id){
+async function deleteMember(id){
   const ws=currentWs();
-  const m=ws.members.find(x=>x.id===id); if(!m) return;
+  const m=gasMembers.find(x=>x.id===id); if(!m) return;
   if(!confirm(`「${m.name}」を削除しますか？`)) return;
-  ws.members=ws.members.filter(x=>x.id!==id);
+  const prev=[...gasMembers];
+  gasMembers=gasMembers.filter(x=>x.id!==id);
   if(document.getElementById('f-edit-id').value===id) _doCancelEdit();
   selectedIds.delete(id);
-  saveState(); renderAll();
+  renderAll();
   toast(`${m.name} を削除しました`,'info');
+  if(isGasEnabled()){
+    const r=await postToGas({action:'deleteMember',id});
+    if(!r||(!r.success&&!r.local)){ gasMembers=prev; renderAll(); toast('削除に失敗しました','error'); }
+  } else {
+    ws.members=[...gasMembers]; saveState();
+  }
 }
 
 // ============================================================
@@ -1322,11 +1388,10 @@ function renderAll(){
   if(currentTab==='matching'){ populateMatchingFormSelects(); renderMatchingBoard(); }
 }
 function renderStatsCards(){
-  const ws=currentWs();
   const flLive=document.getElementById('filter-live')?.value||'';
   const flPerf=document.getElementById('filter-perf')?.value||'';
   // filter-result は分母・分子に影響させない
-  let base=ws.members;
+  let base=gasMembers;
   if(flLive) base=base.filter(m=>m.live===flLive);
   if(flPerf) base=base.filter(m=>m.performance===flPerf);
   const won=base.filter(m=>m.result==='won').length;
@@ -1355,23 +1420,25 @@ function renderStatsCards(){
 }
 function renderFilterOptions(){
   const ws=currentWs();
+  const lives=gasLives.length>0?gasLives:ws.lives;
   const flLive=document.getElementById('filter-live');
   const flPerf=document.getElementById('filter-perf');
   const selLive=flLive.value, selPerf=flPerf.value;
   flLive.innerHTML='<option value="">全ライブ</option>'+
-    ws.lives.map(l=>`<option value="${esc(l.name)}"${l.name===selLive?'selected':''}>${esc(l.name)}</option>`).join('');
-  const lv=ws.lives.find(l=>l.name===flLive.value);
+    lives.map(l=>`<option value="${esc(l.name)}"${l.name===selLive?'selected':''}>${esc(l.name)}</option>`).join('');
+  const lv=lives.find(l=>l.name===flLive.value);
   flPerf.innerHTML='<option value="">全公演</option>'+
     (lv?lv.performances:[]).map(p=>`<option value="${esc(p.name)}"${p.name===selPerf?'selected':''}>${esc(p.name)}</option>`).join('');
 }
 function getFiltered(){
   const ws=currentWs();
+  const lives=gasLives.length>0?gasLives:ws.lives;
   const flLive=document.getElementById('filter-live').value;
   const flPerf=document.getElementById('filter-perf').value;
   const flResult=document.getElementById('filter-result').value;
   const flName=(document.getElementById('filter-name')?.value||'').trim().toLowerCase();
   const sortBy=document.getElementById('sort-by').value;
-  let list=ws.members.filter(m=>{
+  let list=gasMembers.filter(m=>{
     if(flLive&&m.live!==flLive) return false;
     if(flPerf&&m.performance!==flPerf) return false;
     if(flResult&&m.result!==flResult) return false;
@@ -1382,9 +1449,9 @@ function getFiltered(){
   else if(sortBy==='name') list.sort((a,b)=>a.name.localeCompare(b.name,'ja'));
   else if(sortBy==='live'){
     list.sort((a,b)=>{
-      const li=(ws.lives.findIndex(l=>l.name===a.live))-(ws.lives.findIndex(l=>l.name===b.live));
+      const li=(lives.findIndex(l=>l.name===a.live))-(lives.findIndex(l=>l.name===b.live));
       if(li!==0) return li;
-      const lv=ws.lives.find(l=>l.name===a.live); if(!lv) return 0;
+      const lv=lives.find(l=>l.name===a.live); if(!lv) return 0;
       return (lv.performances.findIndex(p=>p.name===a.performance))-(lv.performances.findIndex(p=>p.name===b.performance));
     });
   }
@@ -1393,7 +1460,8 @@ function getFiltered(){
   return list;
 }
 function getPerfDate(ws,liveName,perfName){
-  const live=ws.lives.find(l=>l.name===liveName); if(!live) return '';
+  const lives=gasLives.length>0?gasLives:ws.lives;
+  const live=lives.find(l=>l.name===liveName); if(!live) return '';
   const perf=live.performances.find(p=>p.name===perfName); if(!perf) return '';
   return fmtPerfDate(perf);
 }
@@ -1423,7 +1491,6 @@ function renderMemberList(){
       const extras=[m.afterparty?'打ち上げ':'',m.accommodation?'宿泊':''].filter(Boolean);
       const isEditing=m.id===editId;
       return `<tr class="trow border-b border-slate-800/50 transition-colors${isEditing?' trow-editing':''}" data-id="${esc(m.id)}">
-        <td class="px-2 py-2.5 text-center w-8"><span class="drag-handle text-slate-600"><i class="fa-solid fa-grip-vertical text-sm"></i></span></td>
         <td class="px-2 py-2.5 text-center w-8"><input type="checkbox" class="row-check checkbox-custom" data-id="${esc(m.id)}" ${selectedIds.has(m.id)?'checked':''}></td>
         <td class="px-2 py-2.5 text-slate-500 text-xs w-8">${i+1}</td>
         <td class="px-3 py-2.5 font-semibold text-slate-100 whitespace-nowrap">${esc(m.name)}</td>
@@ -1458,17 +1525,16 @@ function renderMemberList(){
       const extras=[m.afterparty?'打ち上げ':'',m.accommodation?'宿泊':''].filter(Boolean);
       return `<div class="member-card bg-slate-900 border border-slate-800 rounded-xl p-3 transition-colors" data-id="${esc(m.id)}">
         <div class="flex items-center gap-2 mb-1.5">
-          <span class="drag-handle text-slate-600"><i class="fa-solid fa-grip-vertical"></i></span>
           <input type="checkbox" class="row-check checkbox-custom flex-shrink-0" data-id="${esc(m.id)}" ${selectedIds.has(m.id)?'checked':''}>
           <span class="font-semibold text-slate-100 flex-1 text-sm min-w-0 truncate">${esc(m.name)}</span>
           ${resultBadge(m.result)}
         </div>
-        <div class="ml-8 flex flex-wrap gap-1 mb-1.5 items-center">
+        <div class="ml-6 flex flex-wrap gap-1 mb-1.5 items-center">
           ${m.live?`<span class="live-badge px-1.5 py-0.5 rounded text-xs" style="${liveBadgeStyle(m.live)}">${esc(m.live)}</span>`:''}
           ${m.performance?`<span class="perf-badge px-1.5 py-0.5 rounded text-xs">${esc(m.performance)}</span>`:''}
           ${date?`<span class="text-xs text-slate-500">${esc(date)}</span>`:''}
         </div>
-        <div class="ml-8 flex flex-wrap items-center gap-1.5">
+        <div class="ml-6 flex flex-wrap items-center gap-1.5">
           ${seatBadge(m.seatType)}
           ${extras.map(e=>`<span class="bg-slate-700/60 text-slate-400 text-xs px-1.5 py-0.5 rounded">${esc(e)}</span>`).join('')}
           <div class="ml-auto flex gap-1">
@@ -1479,7 +1545,6 @@ function renderMemberList(){
       </div>`;
     }).join('');
   }
-  initMemberSortable();
 }
 
 // ============================================================
@@ -1502,19 +1567,36 @@ function updateBulkBar(){
   if(selectedIds.size>0){ bar.classList.remove('hidden'); document.getElementById('bulk-count').textContent=`${selectedIds.size}件選択中`; }
   else { bar.classList.add('hidden'); }
 }
-function bulkChangeStatus(result){
-  const ws=currentWs(), count=selectedIds.size;
-  ws.members.forEach(m=>{ if(selectedIds.has(m.id)) m.result=result; });
-  saveState(); clearSelection(); renderAll();
-  toast(`${count}件を${RESULT_LABEL[result]}に変更しました`,'info');
-}
-function bulkDelete(){
-  const count=selectedIds.size;
-  if(!confirm(`${count}件のメンバーを削除しますか？`)) return;
+async function bulkChangeStatus(result){
   const ws=currentWs();
-  ws.members=ws.members.filter(m=>!selectedIds.has(m.id));
-  saveState(); clearSelection(); renderAll();
+  const ids=[...selectedIds];
+  const count=ids.length;
+  const prev=gasMembers.map(m=>({...m}));
+  gasMembers.forEach(m=>{ if(ids.includes(m.id)) m.result=result; });
+  clearSelection(); renderAll();
+  toast(`${count}件を${RESULT_LABEL[result]}に変更しました`,'info');
+  if(isGasEnabled()){
+    const r=await postToGas({action:'bulkUpdateMembers',ids,result});
+    if(!r||(!r.success&&!r.local)){ gasMembers=prev; clearSelection(); renderAll(); toast('更新に失敗しました','error'); }
+  } else {
+    ws.members=[...gasMembers]; saveState();
+  }
+}
+async function bulkDelete(){
+  const ws=currentWs();
+  const ids=[...selectedIds];
+  const count=ids.length;
+  if(!confirm(`${count}件のメンバーを削除しますか？`)) return;
+  const prev=[...gasMembers];
+  gasMembers=gasMembers.filter(m=>!ids.includes(m.id));
+  clearSelection(); renderAll();
   toast(`${count}件を削除しました`,'info');
+  if(isGasEnabled()){
+    const r=await postToGas({action:'bulkDeleteMembers',ids});
+    if(!r||(!r.success&&!r.local)){ gasMembers=prev; clearSelection(); renderAll(); toast('削除に失敗しました','error'); }
+  } else {
+    ws.members=[...gasMembers]; saveState();
+  }
 }
 function clearSelection(){
   selectedIds.clear(); updateBulkBar();
@@ -1523,47 +1605,28 @@ function clearSelection(){
 }
 
 // ============================================================
-// DRAG & DROP
-// ============================================================
-function initMemberSortable(){
-  const tbody=document.getElementById('members-tbody');
-  const cards=document.getElementById('cards-container');
-  if(memberSortable){ try{memberSortable.destroy();}catch(e){} memberSortable=null; }
-  if(cardSortable){   try{cardSortable.destroy();}catch(e){} cardSortable=null; }
-  if(document.getElementById('sort-by').value!=='custom') return;
-  memberSortable=Sortable.create(tbody,{handle:'.drag-handle',animation:150,ghostClass:'sortable-ghost',onEnd:()=>applyNewOrder(tbody,'tr')});
-  cardSortable=Sortable.create(cards,{handle:'.drag-handle',animation:150,ghostClass:'sortable-ghost',onEnd:()=>applyNewOrder(cards,'.member-card')});
-}
-function applyNewOrder(container,sel){
-  const ws=currentWs();
-  const order=[...container.querySelectorAll(sel)].map(el=>el.dataset.id).filter(Boolean);
-  order.forEach((id,i)=>{ const m=ws.members.find(x=>x.id===id); if(m) m.sortOrder=i; });
-  ws.members.sort((a,b)=>a.sortOrder-b.sortOrder);
-  saveState(); renderMemberList();
-}
-
-// ============================================================
 // SUMMARY
 // ============================================================
 function updateSummary(){
   const ws=currentWs();
+  const lives=gasLives.length>0?gasLives:ws.lives;
   const incLost=document.getElementById('sum-lost').checked;
   const incPending=document.getElementById('sum-pending').checked;
   const incSeat=document.getElementById('sum-seat').checked;
   const incStats=document.getElementById('sum-stats').checked;
   const lines=[];
   if(incStats){
-    const won=ws.members.filter(m=>m.result==='won').length;
-    const lost=ws.members.filter(m=>m.result==='lost').length;
-    const pending=ws.members.filter(m=>m.result==='pending').length;
+    const won=gasMembers.filter(m=>m.result==='won').length;
+    const lost=gasMembers.filter(m=>m.result==='lost').length;
+    const pending=gasMembers.filter(m=>m.result==='pending').length;
     const decided=won+lost;
     const rate=decided>0?Math.round(won/decided*100)+' %':'—';
     lines.push(`【${ws.name}】`);
-    lines.push(`合計: ${ws.members.length}人 / 当選: ${won}人 / 落選: ${lost}人 / 結果待ち: ${pending}人 / 当選率: ${rate}`);
+    lines.push(`合計: ${gasMembers.length}人 / 当選: ${won}人 / 落選: ${lost}人 / 結果待ち: ${pending}人 / 当選率: ${rate}`);
     lines.push('');
   }
-  ws.lives.forEach(live=>{
-    const lm=ws.members.filter(m=>m.live===live.name); if(!lm.length) return;
+  lives.forEach(live=>{
+    const lm=gasMembers.filter(m=>m.live===live.name); if(!lm.length) return;
     lines.push(`■ ${live.name}`);
     live.performances.forEach(perf=>{
       const pm=lm.filter(m=>m.performance===perf.name); if(!pm.length) return;
@@ -1587,7 +1650,7 @@ function updateSummary(){
     if(noPerf.length){ lines.push('  ▶ 未割当'); noPerf.forEach(m=>lines.push(`    ・${m.name}`)); }
     lines.push('');
   });
-  const noLive=ws.members.filter(m=>!m.live);
+  const noLive=gasMembers.filter(m=>!m.live);
   if(noLive.length){ lines.push('■ ライブ未割当'); noLive.forEach(m=>lines.push(`  ・${m.name}`)); lines.push(''); }
   document.getElementById('summary-output').textContent=lines.join('\n').trimEnd();
 }
@@ -1649,7 +1712,7 @@ function forceDiscard(){
   const target=discardTarget, pending=_pendingEditId;
   closeDiscardModal();
   if(target==='settings'){ closeSettings(); }
-  else { _doCancelEdit(); if(pending){ const ws=currentWs(); const m=ws.members.find(x=>x.id===pending); if(m) _doStartEdit(m); } }
+  else { _doCancelEdit(); if(pending){ const m=gasMembers.find(x=>x.id===pending); if(m) _doStartEdit(m); } }
 }
 
 // ============================================================
@@ -2151,23 +2214,34 @@ function copyMatchingSummary(){
 // ============================================================
 async function migrateLocalToGas(){
   if(!GAS_URL||GAS_URL==='YOUR_GAS_WEB_APP_URL'){ toast('GAS URLが設定されていません','error'); return; }
-  if(!confirm('このデバイスのローカルデータ（ライブ設定・掲示板エントリー）をGASに上書き移行します。\nよろしいですか？')) return;
+  if(!confirm('このデバイスのローカルデータ（ライブ設定・掲示板・メンバー）をGASに上書き移行します。\nよろしいですか？')) return;
   const ws=currentWs();
   const localLives=ws.lives||[];
   const localBoard=ws.matchingBoard||[];
-  let count=0;
+  const localMembers=ws.members||[];
+  let ok=0, fail=0;
   if(localLives.length>0){
     const r=await postToGas({action:'syncLives',lives:localLives});
-    if(r&&r.success&&!r.local){ gasLives=[...localLives]; count+=localLives.length; }
+    if(r&&r.success&&!r.local){ gasLives=[...localLives]; ok+=localLives.length; }
+    else fail+=localLives.length;
   }
-  if(localBoard.length>0){
-    for(const entry of localBoard){ await postToGas({action:'addMatch',entry}); count++; }
-    gasBoard=[...localBoard];
+  for(const entry of localBoard){
+    const r=await postToGas({action:'addMatch',entry});
+    if(r&&r.success&&!r.local) ok++;
+    else fail++;
   }
+  if(ok>0) gasBoard=[...localBoard];
+  for(const entry of localMembers){
+    const r=await postToGas({action:'addMember',entry});
+    if(r&&r.success&&!r.local) ok++;
+    else fail++;
+  }
+  if(ok>0) gasMembers=[...localMembers];
   localStorage.setItem('gas-migrated-v1','1');
-  populateMatchingFormSelects();
-  renderMatchingBoard();
-  toast(`${count}件のデータをGASに移行しました`,'info');
+  renderAll();
+  if(fail>0) toast(`GAS書き込みエラー: ${fail}件失敗 / ${ok}件成功。GASを再デプロイしてください`,'error');
+  else if(ok>0) toast(`${ok}件のデータをGASに移行しました`,'info');
+  else toast('移行するローカルデータがありません','info');
 }
 
 async function fetchFromGas(){
@@ -2176,23 +2250,26 @@ async function fetchFromGas(){
     const ws=currentWs();
     gasLives=[...ws.lives];
     gasBoard=[...(ws.matchingBoard||[])];
-    populateMatchingFormSelects();
-    renderMatchingBoard();
+    gasMembers=[...(ws.members||[])];
+    renderAll();
     return;
   }
   setMatchLoading(true);
+  setMemberLoading(true);
   try {
     const res=await fetch(GAS_URL+'?t='+Date.now());
     if(!res.ok) throw new Error('HTTP '+res.status);
     const data=await res.json();
     gasLives=data.lives||[];
     gasBoard=data.matching||[];
+    gasMembers=data.members||[];
 
     // ローカルデータ移行（GASが空でローカルにデータがある場合、このデバイスで初回のみ実行）
     if(!localStorage.getItem('gas-migrated-v1')){
       const ws=currentWs();
       const localLives=ws.lives||[];
       const localBoard=ws.matchingBoard||[];
+      const localMembers=ws.members||[];
       let migrated=false;
       if(gasLives.length===0&&localLives.length>0){
         const r=await postToGas({action:'syncLives',lives:localLives});
@@ -2200,19 +2277,22 @@ async function fetchFromGas(){
       }
       if(gasBoard.length===0&&localBoard.length>0){
         for(const entry of localBoard){await postToGas({action:'addMatch',entry});}
-        gasBoard=[...localBoard];
-        migrated=true;
+        gasBoard=[...localBoard]; migrated=true;
+      }
+      if(gasMembers.length===0&&localMembers.length>0){
+        for(const entry of localMembers){await postToGas({action:'addMember',entry});}
+        gasMembers=[...localMembers]; migrated=true;
       }
       if(migrated) toast('ローカルデータをGASに移行しました','info');
       localStorage.setItem('gas-migrated-v1','1');
     }
 
-    populateMatchingFormSelects();
-    renderMatchingBoard();
+    renderAll();
   } catch(err){
     toast('データの取得に失敗しました: '+err.message,'error');
   } finally {
     setMatchLoading(false);
+    setMemberLoading(false);
   }
 }
 
@@ -2222,15 +2302,33 @@ async function postToGas(payload){
     const url=GAS_URL+'?payload='+encodeURIComponent(JSON.stringify(payload))+'&t='+Date.now();
     const res=await fetch(url);
     if(!res.ok) throw new Error('HTTP '+res.status);
-    return await res.json();
+    const json=await res.json();
+    // GASが{success:true}以外を返した場合はコンソールに記録
+    if(!json.success&&!json.local) console.warn('[GAS write failed]',payload.action,json);
+    return json;
   } catch(err){
     toast('通信エラー: '+err.message,'error');
     return null;
   }
 }
 
+async function gasWriteTest(){
+  if(!GAS_URL||GAS_URL==='YOUR_GAS_WEB_APP_URL'){ toast('GAS URLが設定されていません','error'); return; }
+  toast('GAS書き込みテスト中...','info');
+  const testEntry={id:'__test__'+Date.now(),type:'want',name:'テスト',live:'',performance:'',seatType:'',count:1,status:'open',fc:'general',priority:'first',priorityOther:'',price:'consult',transfer:'app',guide:'lawson',settlement:'prepay',contact:'',note:'GASテスト',addedAt:Date.now()};
+  const addR=await postToGas({action:'addMatch',entry:testEntry});
+  if(!addR||!addR.success){ toast('書き込みテスト失敗: GASを再デプロイしてください','error'); return; }
+  const delR=await postToGas({action:'deleteMatch',id:testEntry.id});
+  if(delR&&delR.success) toast('GAS書き込みテスト成功！正常に連携されています','info');
+  else toast('書き込みはできましたが削除に失敗: '+JSON.stringify(delR),'error');
+}
+
 function setMatchLoading(on){
   const el=document.getElementById('match-loading');
+  if(el) el.classList.toggle('hidden',!on);
+}
+function setMemberLoading(on){
+  const el=document.getElementById('member-loading');
   if(el) el.classList.toggle('hidden',!on);
 }
 
@@ -2300,8 +2398,10 @@ function bindEvents(){
 loadState();
 bindEvents();
 buildResultBtns('pending');
+// ローカルデータで即時描画してからGASで上書き
+{const _w=currentWs();gasLives=[..._w.lives];gasMembers=[...(_w.members||[])];gasBoard=[...(_w.matchingBoard||[])];}
 renderAll();
-if(currentTab==='matching') fetchFromGas();
+fetchFromGas();
 </script>
 </body>
 </html>
