@@ -138,6 +138,15 @@ main { padding-bottom: max(10rem, calc(8rem + env(safe-area-inset-bottom, 0px)))
 /* Hide scrollbars on horizontal-scroll filter rows */
 .filter-scroll-row { scrollbar-width: none; -webkit-overflow-scrolling: touch; }
 .filter-scroll-row::-webkit-scrollbar { display: none; }
+
+/* Archive cards */
+.archive-card { transition: background .15s; }
+.archive-card:hover { background: rgba(30,41,59,.7); }
+.like-btn { transition: all .15s; }
+.like-btn:hover .like-heart { transform: scale(1.2); }
+.like-heart { display:inline-block; transition: transform .15s; }
+
+.comment-modal-inner { animation: fadeIn 0.2s ease forwards; }
 </style>
 <script>tailwind.config = { darkMode:'class' };</script>
 </head>
@@ -265,6 +274,101 @@ main { padding-bottom: max(10rem, calc(8rem + env(safe-area-inset-bottom, 0px)))
   </div>
 </div>
 
+<!-- ===== MEMBER COMMENT MODAL ===== -->
+<div id="member-comment-modal" class="hidden fixed inset-0 z-[90] flex items-center justify-center bg-black/80 backdrop-blur-sm">
+  <div class="modal-inner bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-md mx-4 shadow-2xl">
+    <div class="flex items-center justify-between px-5 py-4 border-b border-slate-800 flex-shrink-0">
+      <h3 class="font-semibold text-slate-100 flex items-center gap-2">
+        <i class="fa-solid fa-pen-to-square text-rose-400"></i> 一言感想を編集
+      </h3>
+      <button onclick="closeCommentModal()" class="text-slate-400 hover:text-slate-200 transition p-1 rounded">
+        <i class="fa-solid fa-xmark text-lg"></i>
+      </button>
+    </div>
+    <div class="p-5">
+      <div id="comment-modal-member-info" class="bg-slate-800 border border-slate-700 rounded-xl p-3 mb-4 text-sm flex flex-wrap gap-2 items-center"></div>
+      <div class="mb-4">
+        <label class="block text-xs text-slate-400 mb-1.5">一言感想 <span class="text-slate-500 text-xs">(任意)</span></label>
+        <textarea id="comment-modal-text" rows="3" placeholder="最高の参戦でした！" autocomplete="off"
+          class="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-rose-500 focus:ring-1 focus:ring-rose-500 resize-none"></textarea>
+      </div>
+      <input type="hidden" id="comment-modal-member-id">
+      <div class="flex gap-2">
+        <button onclick="closeCommentModal()"
+          class="flex-1 py-2.5 bg-slate-700 hover:bg-slate-600 text-slate-200 font-semibold rounded-xl text-sm transition">
+          キャンセル
+        </button>
+        <button onclick="submitMemberComment()"
+          class="flex-1 py-2.5 bg-rose-600 hover:bg-rose-500 text-white font-bold rounded-xl text-sm transition flex items-center justify-center gap-2">
+          <i class="fa-solid fa-floppy-disk text-xs"></i> 保存する
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== ARCHIVE EDIT MODAL ===== -->
+<div id="archive-edit-modal" class="hidden fixed inset-0 z-[90] flex items-center justify-center bg-black/80 backdrop-blur-sm">
+  <div class="modal-inner bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-lg mx-4 max-h-[90vh] flex flex-col shadow-2xl">
+    <div class="flex items-center justify-between px-5 py-4 border-b border-slate-800 flex-shrink-0">
+      <h3 class="font-semibold text-slate-100 flex items-center gap-2">
+        <i class="fa-solid fa-pen text-rose-400"></i> 参戦履歴を編集
+      </h3>
+      <button onclick="closeArchiveEditModal()" class="text-slate-400 hover:text-slate-200 transition p-1 rounded">
+        <i class="fa-solid fa-xmark text-lg"></i>
+      </button>
+    </div>
+    <div class="overflow-y-auto flex-1 p-5 flex flex-col gap-3">
+      <input type="hidden" id="arc-edit-id">
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div>
+          <label class="block text-xs text-slate-400 mb-1.5">お名前 <span class="text-red-400">*</span></label>
+          <input id="arc-edit-name" type="text" autocomplete="off"
+            class="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-rose-500">
+        </div>
+        <div>
+          <label class="block text-xs text-slate-400 mb-1.5">ライブ</label>
+          <select id="arc-edit-live-select" onchange="onArcEditLiveChange()"
+            class="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-sm text-slate-200 focus:outline-none focus:border-rose-500">
+            <option value="">-- 選択 --</option>
+          </select>
+          <input id="arc-edit-live-other" type="text" placeholder="ライブ名を入力" autocomplete="off"
+            class="hidden mt-1.5 w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-rose-500">
+        </div>
+        <div>
+          <label class="block text-xs text-slate-400 mb-1.5">公演</label>
+          <select id="arc-edit-perf-select" onchange="onArcEditPerfChange()"
+            class="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-sm text-slate-200 focus:outline-none focus:border-rose-500">
+            <option value="">-- 選択 --</option>
+          </select>
+          <input id="arc-edit-perf-other" type="text" placeholder="公演名を入力" autocomplete="off"
+            class="hidden mt-1.5 w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-rose-500">
+        </div>
+      </div>
+      <div>
+        <label class="block text-xs text-slate-400 mb-2">席種</label>
+        <div id="arc-edit-seat-btns" class="flex gap-2.5 flex-wrap"></div>
+        <input type="hidden" id="arc-edit-seat" value="一般">
+      </div>
+      <div>
+        <label class="block text-xs text-slate-400 mb-1.5">一言感想 <span class="text-slate-500 text-xs">(任意)</span></label>
+        <textarea id="arc-edit-comment" rows="3" placeholder="最高の参戦でした！"
+          class="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-rose-500 resize-none"></textarea>
+      </div>
+      <div class="flex gap-2">
+        <button onclick="closeArchiveEditModal()"
+          class="flex-1 py-2.5 bg-slate-700 hover:bg-slate-600 text-slate-200 font-semibold rounded-xl text-sm transition">
+          キャンセル
+        </button>
+        <button onclick="submitArchiveEdit()"
+          class="flex-1 py-2.5 bg-rose-600 hover:bg-rose-500 text-white font-bold rounded-xl text-sm transition flex items-center justify-center gap-2">
+          <i class="fa-solid fa-floppy-disk text-xs"></i> 保存する
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- ===== HEADER ===== -->
 <header class="bg-slate-900 border-b border-slate-800 sticky top-0 z-40">
   <div class="max-w-7xl mx-auto px-3 sm:px-6 py-3 flex items-center gap-3">
@@ -313,6 +417,11 @@ main { padding-bottom: max(10rem, calc(8rem + env(safe-area-inset-bottom, 0px)))
         class="nav-tab flex items-center gap-2 px-5 py-3 text-sm font-semibold">
         <i class="fa-solid fa-arrows-left-right"></i>
         <span>マッチングボード</span>
+      </button>
+      <button id="tab-archives" onclick="switchTab('archives')"
+        class="nav-tab flex items-center gap-2 px-5 py-3 text-sm font-semibold">
+        <i class="fa-solid fa-book-open"></i>
+        <span>参戦履歴</span>
       </button>
     </div>
   </div>
@@ -413,9 +522,9 @@ main { padding-bottom: max(10rem, calc(8rem + env(safe-area-inset-bottom, 0px)))
     <div class="flex gap-2 items-center overflow-x-auto filter-scroll-row">
       <select id="sort-by"
         class="flex-shrink-0 bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-slate-300 focus:outline-none focus:border-indigo-500">
+        <option value="live" selected>ライブ順</option>
         <option value="custom">追加順</option>
         <option value="name">名前順</option>
-        <option value="live">ライブ順</option>
         <option value="result">結果順</option>
         <option value="seat">座席順</option>
       </select>
@@ -504,7 +613,78 @@ main { padding-bottom: max(10rem, calc(8rem + env(safe-area-inset-bottom, 0px)))
       class="bg-slate-950 border border-slate-800 rounded-lg p-3 text-xs text-slate-300 whitespace-pre-wrap font-mono leading-relaxed min-h-[80px]"></pre>
   </div>
 
+
 </section><!-- /section-manager -->
+
+<!-- ==================== ARCHIVES SECTION ==================== -->
+<section id="section-archives" class="hidden pt-3">
+
+  <!-- Manual add form -->
+  <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 sm:p-5 mb-4">
+    <h2 class="text-sm font-semibold text-slate-300 mb-4 flex items-center gap-2">
+      <i class="fa-solid fa-plus text-rose-400"></i> 参戦記録を手動追加
+    </h2>
+    <!-- 名前 / ライブ / 公演 -->
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3">
+      <div>
+        <label class="block text-xs text-slate-400 mb-1.5">お名前 <span class="text-red-400">*</span></label>
+        <input id="arc-name" type="text" placeholder="35Pさん" autocomplete="off"
+          class="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-rose-500 focus:ring-1 focus:ring-rose-500">
+      </div>
+      <div>
+        <label class="block text-xs text-slate-400 mb-1.5">ライブ</label>
+        <select id="arc-live-select" onchange="onArcLiveSelectChange()"
+          class="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-sm text-slate-200 focus:outline-none focus:border-rose-500 focus:ring-1 focus:ring-rose-500">
+          <option value="">-- 選択 --</option>
+        </select>
+        <input id="arc-live-other" type="text" placeholder="ライブ名を入力" autocomplete="off"
+          class="hidden mt-1.5 w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-rose-500 focus:ring-1 focus:ring-rose-500">
+      </div>
+      <div>
+        <label class="block text-xs text-slate-400 mb-1.5">公演</label>
+        <select id="arc-perf-select" onchange="onArcPerfSelectChange()"
+          class="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-sm text-slate-200 focus:outline-none focus:border-rose-500 focus:ring-1 focus:ring-rose-500">
+          <option value="">-- 選択 --</option>
+        </select>
+        <input id="arc-perf-other" type="text" placeholder="公演名を入力" autocomplete="off"
+          class="hidden mt-1.5 w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-rose-500 focus:ring-1 focus:ring-rose-500">
+      </div>
+    </div>
+    <!-- 席種（タッチ式ボタン UI） -->
+    <div class="mb-3">
+      <label class="block text-xs text-slate-400 mb-2">席種</label>
+      <div id="arc-seat-btns" class="flex gap-2.5 flex-wrap"></div>
+      <input type="hidden" id="arc-seat" value="一般">
+    </div>
+    <!-- 感想 -->
+    <div class="mb-3">
+      <label class="block text-xs text-slate-400 mb-1.5">一言感想 <span class="text-slate-500 text-xs">(任意)</span></label>
+      <input id="arc-comment" type="text" placeholder="最高の参戦でした！"
+        class="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-rose-500 focus:ring-1 focus:ring-rose-500">
+    </div>
+    <button onclick="onArchiveFormSubmit()"
+      class="w-full bg-rose-700 hover:bg-rose-600 text-white py-3 rounded-xl transition font-bold text-sm flex items-center justify-center gap-2">
+      <i class="fa-solid fa-plus"></i> 追加する
+    </button>
+  </div>
+
+  <!-- Header + list -->
+  <div class="flex items-center justify-between mb-4 flex-wrap gap-2">
+    <h2 class="text-sm font-semibold text-slate-300 flex items-center gap-2">
+      <i class="fa-solid fa-book-open text-rose-400"></i> 参戦履歴
+    </h2>
+    <button onclick="fetchFromGas()" title="最新データに更新"
+      class="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 text-xs px-3 py-1.5 rounded-lg transition flex items-center gap-1.5">
+      <i class="fa-solid fa-rotate-right"></i> 更新
+    </button>
+  </div>
+  <div id="archives-list" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3"></div>
+  <div id="archives-empty" class="hidden text-center py-14 text-slate-500 text-sm">
+    <i class="fa-solid fa-book text-3xl mb-3 block text-slate-700"></i>
+    参戦履歴がありません<br>
+    <span class="text-xs text-slate-600">ライブの最終日を過ぎると自動で表示されます</span>
+  </div>
+</section><!-- /section-archives -->
 
 <!-- ==================== MATCHING SECTION ==================== -->
 <section id="section-matching" class="hidden pt-3">
@@ -893,10 +1073,26 @@ let editingMatchId = null;
 // GAS CONFIG  ※デプロイ後にURLを書き換えてください
 // ============================================================
 const GAS_URL  = 'https://script.google.com/macros/s/AKfycbzks9aIIcS4KDTOiGUMhR7nFYc_shEZhOzqCXoS7HzLjvx1kSAgSeUa5vR1Y4zi1YZsBw/exec';
-let gasLives   = [];
-let gasBoard   = [];
-let gasMembers = [];
+let gasLives    = [];
+let gasBoard    = [];
+let gasMembers  = [];
+let gasArchives = [];
 function isGasEnabled(){ return !!GAS_URL && GAS_URL !== 'YOUR_GAS_WEB_APP_URL'; }
+const GM_ARCHIVES = 'gas-migrated-archives-v1';
+
+// ============================================================
+// LIVE EXPIRY HELPERS
+// ============================================================
+function isLiveExpired(live){
+  if(!live) return false;
+  if(live.manualEnded) return true;
+  if(!live.endDate) return false;
+  const today=new Date(); today.setHours(0,0,0,0);
+  const end=new Date(live.endDate+'T00:00:00');
+  return today>end;
+}
+function getAllLives(){ return gasLives.length>0?gasLives:currentWs().lives; }
+function getActiveLives(){ return getAllLives().filter(l=>!isLiveExpired(l)); }
 
 // ============================================================
 // UTILS
@@ -1003,9 +1199,12 @@ function switchTab(tab){
   currentTab=tab;
   document.getElementById('section-manager').classList.toggle('hidden',tab!=='manager');
   document.getElementById('section-matching').classList.toggle('hidden',tab!=='matching');
+  document.getElementById('section-archives').classList.toggle('hidden',tab!=='archives');
   document.getElementById('tab-manager').classList.toggle('active-tab',tab==='manager');
   document.getElementById('tab-matching').classList.toggle('active-tab',tab==='matching');
+  document.getElementById('tab-archives').classList.toggle('active-tab',tab==='archives');
   if(tab==='matching'){ populateMatchingFormSelects(); renderMatchingBoard(); fetchFromGas(); }
+  if(tab==='archives'){ populateArchiveFormSelects(); buildArcSeatBtns(); renderArchives(); }
 }
 
 // ============================================================
@@ -1103,6 +1302,21 @@ function renderSettingsModal(){
         </select>
         <button onclick="removeLive('${esc(live.id)}')" class="text-slate-500 hover:text-red-400 transition p-1.5 rounded" title="削除"><i class="fa-solid fa-trash-can text-sm"></i></button>
       </div>
+      <div class="flex items-center gap-2 mb-2 ml-8">
+        <i class="fa-solid fa-calendar-xmark text-slate-500 text-xs flex-shrink-0"></i>
+        <span class="text-xs text-slate-500 flex-shrink-0">最終日</span>
+        <input type="date" value="${esc(live.endDate||'')}" class="live-enddate-input bg-slate-700 border border-slate-600 rounded px-2 py-0.5 text-xs text-slate-300 focus:outline-none focus:border-indigo-500" style="width:8.5rem" title="この日の翌日以降、終了ライブとして自動隔離されます">
+        <span class="text-xs text-slate-600 italic">を過ぎると終了扱い</span>
+      </div>
+      <div class="flex items-center gap-2 mb-2 ml-8">
+        <i class="fa-solid fa-toggle-on text-slate-500 text-xs flex-shrink-0"></i>
+        <span class="text-xs text-slate-500 flex-shrink-0">強制終演</span>
+        <label class="relative inline-flex items-center cursor-pointer flex-shrink-0">
+          <input type="checkbox" class="live-manualended-input sr-only peer" ${live.manualEnded?'checked':''}>
+          <div class="w-9 h-5 bg-slate-600 peer-focus:outline-none rounded-full peer peer-checked:bg-rose-600 after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-4"></div>
+        </label>
+        <span class="text-xs text-slate-600 italic">ONで即終了扱い（日付に関わらず）</span>
+      </div>
       <div class="perf-list flex flex-col gap-1.5 ml-6 mb-2" data-live-id="${esc(live.id)}">
         ${live.performances.map(p=>`
           <div class="perf-item flex items-center gap-2 bg-slate-700/50 border border-slate-600/60 rounded-lg px-2 py-1.5 flex-wrap" data-perf-id="${esc(p.id)}">
@@ -1131,6 +1345,8 @@ function syncSettingsFromDOM(){
     const ni=block.querySelector('.live-name-input'); if(ni) live.name=ni.value;
     const ci=block.querySelector('.live-color-input'); if(ci) live.color=ci.value;
     const gi=block.querySelector('.live-guide-select'); if(gi) live.guide=gi.value;
+    const edi=block.querySelector('.live-enddate-input'); if(edi) live.endDate=edi.value;
+    const mei=block.querySelector('.live-manualended-input'); if(mei) live.manualEnded=mei.checked;
     const perfOrder=[];
     block.querySelectorAll('.perf-item').forEach(pi=>{
       const perfId=pi.dataset.perfId;
@@ -1147,7 +1363,7 @@ function syncSettingsFromDOM(){
 }
 function addLive(){
   syncSettingsFromDOM();
-  settingsDraft.push({id:genId('live'),name:'新しいライブ',color:LIVE_PALETTE[settingsDraft.length%LIVE_PALETTE.length],guide:'lawson',performances:[]});
+  settingsDraft.push({id:genId('live'),name:'新しいライブ',color:LIVE_PALETTE[settingsDraft.length%LIVE_PALETTE.length],guide:'lawson',endDate:'',manualEnded:false,performances:[]});
   renderSettingsModal();
   const blocks=document.querySelectorAll('.live-block');
   blocks[blocks.length-1]?.querySelector('.live-name-input')?.focus();
@@ -1236,8 +1452,7 @@ function getOption(type){
 // MEMBER FORM
 // ============================================================
 function populateFormSelects(){
-  const ws=currentWs();
-  const lives=gasLives.length>0?gasLives:ws.lives;
+  const lives=getActiveLives(); // 終了ライブはフォームに表示しない
   const liveEl=document.getElementById('f-live');
   const selLive=liveEl.value;
   liveEl.innerHTML='<option value="">-- 選択 --</option>'+
@@ -1246,8 +1461,7 @@ function populateFormSelects(){
   buildSeatBtns();
 }
 function updatePerfSelect(){
-  const ws=currentWs();
-  const lives=gasLives.length>0?gasLives:ws.lives;
+  const lives=getActiveLives(); // 終了ライブは除外
   const liveName=document.getElementById('f-live').value;
   const perfEl=document.getElementById('f-perf');
   const selPerf=perfEl.value;
@@ -1277,9 +1491,9 @@ async function onFormSubmit(){
     if(!m) return;
     const prev={...m};
     Object.assign(m,data);
+    _doCancelEdit();
     renderAll();
     toast(`${name} を更新しました`);
-    _doCancelEdit();
     if(isGasEnabled()){
       const r=await postToGas({action:'updateMember',entry:{...m}});
       if(!r||(!r.success&&!r.local)){ Object.assign(m,prev); renderAll(); toast('更新に失敗しました','error'); }
@@ -1287,6 +1501,14 @@ async function onFormSubmit(){
       ws.members=[...gasMembers]; saveState();
     }
   } else {
+    // 重複チェック: 同一 名前・ライブ・公演 の組み合わせが既に存在する場合は拒否
+    const dupLive=data.live||''; const dupPerf=data.performance||'';
+    const isDup=gasMembers.some(m=>m.name===name&&(m.live||'')=== dupLive&&(m.performance||'')=== dupPerf);
+    if(isDup){
+      _shake(document.getElementById('f-name'));
+      toast(`「${name}」は${dupLive?dupLive+'・':''}${dupPerf||'同一公演'}で既に登録済みです`,'error');
+      return;
+    }
     const entry={id:genId('mem'),...data,addedAt:Date.now(),sortOrder:gasMembers.length};
     gasMembers.push(entry);
     document.getElementById('f-name').value='';
@@ -1328,7 +1550,8 @@ function _doStartEdit(m){
   document.getElementById('form-submit-btn').className='flex-1 bg-amber-600 hover:bg-amber-500 text-white py-3.5 rounded-xl transition font-bold text-base flex items-center justify-center gap-2';
   document.getElementById('form-cancel-btn').classList.remove('hidden');
   showEditBar();
-  document.getElementById('form-section').scrollIntoView({behavior:'smooth',block:'start'});
+  const _fEl=document.getElementById('form-section');
+  window.scrollTo({top:Math.max(0,_fEl.getBoundingClientRect().top+window.scrollY-120),behavior:'smooth'});
   setTimeout(()=>document.getElementById('f-name').focus(),300);
 }
 function _doCancelEdit(){
@@ -1347,6 +1570,7 @@ function _doCancelEdit(){
   document.getElementById('form-submit-btn').className='flex-1 bg-indigo-600 hover:bg-indigo-500 text-white py-3.5 rounded-xl transition font-bold text-base flex items-center justify-center gap-2';
   document.getElementById('form-cancel-btn').classList.add('hidden');
   hideEditBar();
+  renderMemberList();
 }
 function cancelEdit(){
   const editId=document.getElementById('f-edit-id').value;
@@ -1386,6 +1610,7 @@ function renderAll(){
   renderMemberList();
   updateSummary();
   if(currentTab==='matching'){ populateMatchingFormSelects(); renderMatchingBoard(); }
+  if(currentTab==='archives'){ populateArchiveFormSelects(); buildArcSeatBtns(); renderArchives(); }
 }
 function renderStatsCards(){
   const flLive=document.getElementById('filter-live')?.value||'';
@@ -1432,7 +1657,7 @@ function renderFilterOptions(){
 }
 function getFiltered(){
   const ws=currentWs();
-  const lives=gasLives.length>0?gasLives:ws.lives;
+  const lives=getAllLives(); // 終了ライブも含めてソート基準に使用
   const flLive=document.getElementById('filter-live').value;
   const flPerf=document.getElementById('filter-perf').value;
   const flResult=document.getElementById('filter-result').value;
@@ -1474,76 +1699,80 @@ function liveBadgeStyle(liveName){
   return `background:${c}22;color:${c};border-color:${c}55;`;
 }
 
+function _memberRowHtml(m,i,ws,editId,showIndex){
+  const date=getPerfDate(ws,m.live,m.performance);
+  const extras=[m.afterparty?'打ち上げ':'',m.accommodation?'宿泊':''].filter(Boolean);
+  const isEditing=m.id===editId;
+  return `<tr class="trow border-b border-slate-800/50 transition-colors${isEditing?' trow-editing':''}" data-id="${esc(m.id)}">
+    <td class="px-2 py-2.5 text-center w-8"><input type="checkbox" class="row-check checkbox-custom" data-id="${esc(m.id)}" ${selectedIds.has(m.id)?'checked':''}></td>
+    ${showIndex?`<td class="px-2 py-2.5 text-slate-500 text-xs w-8">${i+1}</td>`:''}
+    <td class="px-3 py-2.5 font-semibold text-slate-100 whitespace-nowrap">${esc(m.name)}</td>
+    <td class="px-3 py-2.5"><div class="flex flex-col gap-0.5">
+      ${m.live?`<span class="live-badge px-1.5 py-0.5 rounded text-xs inline-block" style="${liveBadgeStyle(m.live)}">${esc(m.live)}</span>`:''}
+      ${m.performance?`<span class="perf-badge px-1.5 py-0.5 rounded text-xs inline-block">${esc(m.performance)}${date?` <span class="opacity-60">· ${esc(date)}</span>`:''}</span>`:''}
+    </div></td>
+    <td class="px-3 py-2.5">${seatBadge(m.seatType)}</td>
+    <td class="px-3 py-2.5">${resultBadge(m.result)}</td>
+    ${showIndex?`<td class="px-3 py-2.5 text-xs">${extras.map(e=>`<span class="bg-slate-700/60 text-slate-400 px-1.5 py-0.5 rounded mr-1">${esc(e)}</span>`).join('')}</td>`:''}
+    <td class="px-3 py-2.5"><div class="flex items-center gap-1">
+      <button onclick="startEdit('${esc(m.id)}')" class="text-slate-400 hover:text-indigo-400 transition p-1.5 rounded hover:bg-slate-700" title="編集"><i class="fa-solid fa-pen text-xs"></i></button>
+      <button onclick="deleteMember('${esc(m.id)}')" class="text-slate-400 hover:text-red-400 transition p-1.5 rounded hover:bg-slate-700" title="削除"><i class="fa-solid fa-trash text-xs"></i></button>
+    </div></td>
+  </tr>`;
+}
+function _memberCardHtml(m,ws){
+  const date=getPerfDate(ws,m.live,m.performance);
+  const extras=[m.afterparty?'打ち上げ':'',m.accommodation?'宿泊':''].filter(Boolean);
+  return `<div class="member-card bg-slate-900 border border-slate-800 rounded-xl p-3 transition-colors" data-id="${esc(m.id)}">
+    <div class="flex items-center gap-2 mb-1.5">
+      <input type="checkbox" class="row-check checkbox-custom flex-shrink-0" data-id="${esc(m.id)}" ${selectedIds.has(m.id)?'checked':''}>
+      <span class="font-semibold text-slate-100 flex-1 text-sm min-w-0 truncate">${esc(m.name)}</span>
+      ${resultBadge(m.result)}
+    </div>
+    <div class="ml-6 flex flex-wrap gap-1 mb-1.5 items-center">
+      ${m.live?`<span class="live-badge px-1.5 py-0.5 rounded text-xs" style="${liveBadgeStyle(m.live)}">${esc(m.live)}</span>`:''}
+      ${m.performance?`<span class="perf-badge px-1.5 py-0.5 rounded text-xs">${esc(m.performance)}</span>`:''}
+      ${date?`<span class="text-xs text-slate-500">${esc(date)}</span>`:''}
+    </div>
+    <div class="ml-6 flex flex-wrap items-center gap-1.5">
+      ${seatBadge(m.seatType)}
+      ${extras.map(e=>`<span class="bg-slate-700/60 text-slate-400 text-xs px-1.5 py-0.5 rounded">${esc(e)}</span>`).join('')}
+      <div class="ml-auto flex gap-1">
+        <button onclick="startEdit('${esc(m.id)}')" class="text-slate-400 hover:text-indigo-400 transition p-1.5 rounded hover:bg-slate-700"><i class="fa-solid fa-pen text-xs"></i></button>
+        <button onclick="deleteMember('${esc(m.id)}')" class="text-slate-400 hover:text-red-400 transition p-1.5 rounded hover:bg-slate-700"><i class="fa-solid fa-trash text-xs"></i></button>
+      </div>
+    </div>
+  </div>`;
+}
+
 function renderMemberList(){
   const ws=currentWs();
-  const members=getFiltered();
+  const lives=getAllLives();
+  const allFiltered=getFiltered();
   const editId=document.getElementById('f-edit-id').value;
-  document.getElementById('filtered-count').textContent=members.length>0?`${members.length}件`:'';
+
+  // endDate過ぎたライブのメンバーは参戦履歴タブへ自動移行 → 当落管理から完全非表示
+  const activeMembers=allFiltered.filter(m=>{ const lv=lives.find(l=>l.name===m.live); return !lv||!isLiveExpired(lv); });
+
+  document.getElementById('filtered-count').textContent=activeMembers.length>0?`${activeMembers.length}件`:'';
 
   const tbody=document.getElementById('members-tbody');
   const tableEmpty=document.getElementById('table-empty');
-  if(members.length===0){
+  if(activeMembers.length===0){
     tbody.innerHTML=''; tableEmpty.classList.remove('hidden');
   } else {
     tableEmpty.classList.add('hidden');
-    tbody.innerHTML=members.map((m,i)=>{
-      const date=getPerfDate(ws,m.live,m.performance);
-      const extras=[m.afterparty?'打ち上げ':'',m.accommodation?'宿泊':''].filter(Boolean);
-      const isEditing=m.id===editId;
-      return `<tr class="trow border-b border-slate-800/50 transition-colors${isEditing?' trow-editing':''}" data-id="${esc(m.id)}">
-        <td class="px-2 py-2.5 text-center w-8"><input type="checkbox" class="row-check checkbox-custom" data-id="${esc(m.id)}" ${selectedIds.has(m.id)?'checked':''}></td>
-        <td class="px-2 py-2.5 text-slate-500 text-xs w-8">${i+1}</td>
-        <td class="px-3 py-2.5 font-semibold text-slate-100 whitespace-nowrap">${esc(m.name)}</td>
-        <td class="px-3 py-2.5">
-          <div class="flex flex-col gap-0.5">
-            ${m.live?`<span class="live-badge px-1.5 py-0.5 rounded text-xs inline-block" style="${liveBadgeStyle(m.live)}">${esc(m.live)}</span>`:''}
-            ${m.performance?`<span class="perf-badge px-1.5 py-0.5 rounded text-xs inline-block">${esc(m.performance)}${date?` <span class="opacity-60">· ${esc(date)}</span>`:''}</span>`:''}
-          </div>
-        </td>
-        <td class="px-3 py-2.5">${seatBadge(m.seatType)}</td>
-        <td class="px-3 py-2.5">${resultBadge(m.result)}</td>
-        <td class="px-3 py-2.5 text-xs">${extras.map(e=>`<span class="bg-slate-700/60 text-slate-400 px-1.5 py-0.5 rounded mr-1">${esc(e)}</span>`).join('')}</td>
-        <td class="px-3 py-2.5">
-          <div class="flex items-center gap-1">
-            <button onclick="startEdit('${esc(m.id)}')" class="text-slate-400 hover:text-indigo-400 transition p-1.5 rounded hover:bg-slate-700" title="編集"><i class="fa-solid fa-pen text-xs"></i></button>
-            <button onclick="deleteMember('${esc(m.id)}')" class="text-slate-400 hover:text-red-400 transition p-1.5 rounded hover:bg-slate-700" title="削除"><i class="fa-solid fa-trash text-xs"></i></button>
-          </div>
-        </td>
-      </tr>`;
-    }).join('');
-    document.getElementById('select-all').checked=members.length>0&&members.every(m=>selectedIds.has(m.id));
+    tbody.innerHTML=activeMembers.map((m,i)=>_memberRowHtml(m,i,ws,editId,true)).join('');
+    document.getElementById('select-all').checked=activeMembers.length>0&&activeMembers.every(m=>selectedIds.has(m.id));
   }
 
   const cardsContainer=document.getElementById('cards-container');
   const cardsEmpty=document.getElementById('cards-empty');
-  if(members.length===0){
+  if(activeMembers.length===0){
     cardsContainer.innerHTML=''; cardsEmpty.classList.remove('hidden');
   } else {
     cardsEmpty.classList.add('hidden');
-    cardsContainer.innerHTML=members.map(m=>{
-      const date=getPerfDate(ws,m.live,m.performance);
-      const extras=[m.afterparty?'打ち上げ':'',m.accommodation?'宿泊':''].filter(Boolean);
-      return `<div class="member-card bg-slate-900 border border-slate-800 rounded-xl p-3 transition-colors" data-id="${esc(m.id)}">
-        <div class="flex items-center gap-2 mb-1.5">
-          <input type="checkbox" class="row-check checkbox-custom flex-shrink-0" data-id="${esc(m.id)}" ${selectedIds.has(m.id)?'checked':''}>
-          <span class="font-semibold text-slate-100 flex-1 text-sm min-w-0 truncate">${esc(m.name)}</span>
-          ${resultBadge(m.result)}
-        </div>
-        <div class="ml-6 flex flex-wrap gap-1 mb-1.5 items-center">
-          ${m.live?`<span class="live-badge px-1.5 py-0.5 rounded text-xs" style="${liveBadgeStyle(m.live)}">${esc(m.live)}</span>`:''}
-          ${m.performance?`<span class="perf-badge px-1.5 py-0.5 rounded text-xs">${esc(m.performance)}</span>`:''}
-          ${date?`<span class="text-xs text-slate-500">${esc(date)}</span>`:''}
-        </div>
-        <div class="ml-6 flex flex-wrap items-center gap-1.5">
-          ${seatBadge(m.seatType)}
-          ${extras.map(e=>`<span class="bg-slate-700/60 text-slate-400 text-xs px-1.5 py-0.5 rounded">${esc(e)}</span>`).join('')}
-          <div class="ml-auto flex gap-1">
-            <button onclick="startEdit('${esc(m.id)}')" class="text-slate-400 hover:text-indigo-400 transition p-1.5 rounded hover:bg-slate-700"><i class="fa-solid fa-pen text-xs"></i></button>
-            <button onclick="deleteMember('${esc(m.id)}')" class="text-slate-400 hover:text-red-400 transition p-1.5 rounded hover:bg-slate-700"><i class="fa-solid fa-trash text-xs"></i></button>
-          </div>
-        </div>
-      </div>`;
-    }).join('');
+    cardsContainer.innerHTML=activeMembers.map(m=>_memberCardHtml(m,ws)).join('');
   }
 }
 
@@ -1736,7 +1965,7 @@ function saveEditFromBar(){
 // MATCHING BOARD
 // ============================================================
 function updateMfPerfOptions(){
-  const lives=gasLives.length>0?gasLives:currentWs().lives;
+  const lives=getActiveLives(); // 終了ライブのフィルターは非表示
   const mfLiveVal=document.getElementById('mf-live')?.value||'';
   const mfPerf=document.getElementById('mf-perf'); if(!mfPerf) return;
   const selPerf=mfPerf.value;
@@ -1746,7 +1975,7 @@ function updateMfPerfOptions(){
 }
 function populateMatchingFormSelects(){
   const ws=currentWs();
-  const lives=gasLives.length>0?gasLives:ws.lives;
+  const activeLives=getActiveLives(); // 終了ライブは募集フォームとフィルターから除外
   const dl=document.getElementById('member-names-list');
   if(dl){
     const names=[...new Set(ws.members.map(m=>m.name))];
@@ -1755,19 +1984,19 @@ function populateMatchingFormSelects(){
   const ml=document.getElementById('m-live'); if(!ml) return;
   const selLive=ml.value;
   ml.innerHTML='<option value="">-- ライブ --</option>'+
-    lives.map(l=>`<option value="${esc(l.name)}"${l.name===selLive?'selected':''}>${esc(l.name)}</option>`).join('');
+    activeLives.map(l=>`<option value="${esc(l.name)}"${l.name===selLive?'selected':''}>${esc(l.name)}</option>`).join('');
   updateMatchPerfSelect();
   buildMatchSeatBtns(document.getElementById('m-seat')?.value||'一般');
   const mfLive=document.getElementById('mf-live');
   if(mfLive){
     const sel=mfLive.value;
     mfLive.innerHTML='<option value="">全ライブ</option>'+
-      lives.map(l=>`<option value="${esc(l.name)}"${l.name===sel?'selected':''}>${esc(l.name)}</option>`).join('');
+      activeLives.map(l=>`<option value="${esc(l.name)}"${l.name===sel?'selected':''}>${esc(l.name)}</option>`).join('');
   }
   updateMfPerfOptions();
 }
 function updateMatchPerfSelect(){
-  const lives=gasLives.length>0?gasLives:currentWs().lives;
+  const lives=getActiveLives(); // 終了ライブは除外
   const type=document.getElementById('m-type')?.value||'give';
   const isWant=type==='want';
   const liveName=document.getElementById('m-live')?.value;
@@ -1785,7 +2014,7 @@ function updateMatchPerfSelect(){
   applyLiveGuide();
 }
 function applyLiveGuide(){
-  const lives=gasLives.length>0?gasLives:currentWs().lives;
+  const lives=getAllLives();
   const liveVal=document.getElementById('m-live')?.value||'';
   const live=lives.find(l=>l.name===liveVal);
   const guide=live?.guide||'lawson';
@@ -1932,7 +2161,8 @@ function startMatchEdit(id){
   const lbl=document.getElementById('m-submit-label'); if(lbl) lbl.textContent='更新する';
   const cancelBtn=document.getElementById('m-cancel-btn'); if(cancelBtn) cancelBtn.classList.remove('hidden');
   document.getElementById('match-edit-bar')?.classList.remove('hidden');
-  document.getElementById('match-form-section')?.scrollIntoView({behavior:'smooth',block:'start'});
+  const _mfEl=document.getElementById('match-form-section');
+  if(_mfEl) window.scrollTo({top:Math.max(0,_mfEl.getBoundingClientRect().top+window.scrollY-120),behavior:'smooth'});
 }
 function cancelMatchEdit(){
   editingMatchId=null;
@@ -2000,15 +2230,14 @@ async function addMatchingEntry(){
   };
   if(editingMatchId){
     const idx=gasBoard.findIndex(e=>e.id===editingMatchId);
-    if(idx>=0){
-      const prev={...gasBoard[idx]};
-      const updated={...gasBoard[idx],...entryData};
-      gasBoard[idx]=updated;
-      cancelMatchEdit(); renderMatchingBoard();
-      toast(`${name} のエントリーを更新しました`);
-      const result=await postToGas({action:'updateMatch',entry:updated});
-      if(!result||(!result.success&&!result.local)){ gasBoard[idx]=prev; renderMatchingBoard(); toast('更新に失敗しました','error'); }
-    }
+    if(idx<0){ toast('エントリーが見つかりません','error'); cancelMatchEdit(); return; }
+    const prev={...gasBoard[idx]};
+    const updated={...gasBoard[idx],...entryData};
+    gasBoard[idx]=updated;
+    cancelMatchEdit(); renderMatchingBoard();
+    toast(`${name} のエントリーを更新しました`);
+    const result=await postToGas({action:'updateMatch',entry:updated});
+    if(!result||(!result.success&&!result.local)){ gasBoard[idx]=prev; renderMatchingBoard(); toast('更新に失敗しました','error'); }
     return;
   }
   const entry={id:genId('match'),...entryData,addedAt:Date.now()};
@@ -2210,6 +2439,403 @@ function copyMatchingSummary(){
 }
 
 // ============================================================
+// ARCHIVES（参戦履歴）
+// ============================================================
+function renderArchives(){
+  const container=document.getElementById('archives-list');
+  const emptyEl=document.getElementById('archives-empty');
+  if(!container) return;
+  const lives=getAllLives();
+  // ① 自動移行: endDate過ぎたライブのメンバー
+  const autoMembers=gasMembers.filter(m=>{ const lv=lives.find(l=>l.name===m.live); return lv&&isLiveExpired(lv); });
+  // ② 手動: Archivesシートのデータ
+  const manualArchives=gasArchives;
+
+  if(autoMembers.length===0&&manualArchives.length===0){
+    container.innerHTML='';
+    if(emptyEl) emptyEl.classList.remove('hidden');
+    return;
+  }
+  if(emptyEl) emptyEl.classList.add('hidden');
+
+  // 新しい順で結合表示
+  const combined=[
+    ...autoMembers.map(m=>({_type:'auto',_data:m,_at:m.addedAt||0})),
+    ...manualArchives.map(a=>({_type:'manual',_data:a,_at:a.addedAt||0}))
+  ].sort((a,b)=>b._at-a._at);
+
+  container.innerHTML=combined.map(item=>{
+    if(item._type==='auto'){
+      const m=item._data;
+      const seatCls=SEAT_CLS[m.seatType||'一般']||'ippan';
+      const liveStyle=liveBadgeStyle(m.live||'');
+      return `<div class="archive-card bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
+        <div class="h-1 bg-indigo-600/60"></div>
+        <div class="p-4">
+          <div class="flex items-center gap-2 mb-2">
+            <span class="font-bold text-slate-100 flex-1 text-sm truncate">${esc(m.name)}</span>
+            <span class="text-xs px-2 py-0.5 rounded font-bold flex-shrink-0 bg-indigo-950 text-indigo-300 border border-indigo-800">自動</span>
+            ${resultBadge(m.result)}
+          </div>
+          <div class="flex flex-wrap gap-1.5 mb-3">
+            ${m.live?`<span class="live-badge px-1.5 py-0.5 rounded text-xs" style="${liveStyle}">${esc(m.live)}</span>`:''}
+            ${m.performance?`<span class="perf-badge px-1.5 py-0.5 rounded text-xs">${esc(m.performance)}</span>`:''}
+            <span class="sb-${seatCls} px-2 py-0.5 rounded text-xs font-bold">${esc(m.seatType||'一般')}</span>
+          </div>
+          ${m.comment?`<p class="text-xs text-slate-400 bg-slate-800/50 rounded-lg px-2.5 py-1.5 mb-3 leading-relaxed">${esc(m.comment)}</p>`:''}
+          <div class="flex items-center justify-between pt-2 border-t border-slate-800/50">
+            <button onclick="openCommentModal('${esc(m.id)}')"
+              class="text-xs text-slate-500 hover:text-indigo-400 transition px-2 py-1 rounded hover:bg-slate-800 flex items-center gap-1">
+              <i class="fa-solid fa-pen text-xs"></i> ${m.comment?'感想を編集':'感想を追加'}
+            </button>
+            <button onclick="incrementMemberLike('${esc(m.id)}')"
+              class="like-btn flex items-center gap-1.5 text-xs text-slate-500 hover:text-rose-400 transition px-2 py-1 rounded hover:bg-slate-800 select-none">
+              <i class="fa-solid fa-heart like-heart text-rose-500/80"></i>
+              <span id="member-like-count-${esc(m.id)}">${m.likes||0}</span>
+            </button>
+          </div>
+        </div>
+      </div>`;
+    } else {
+      const arc=item._data;
+      const seatCls=SEAT_CLS[arc.seatType||'一般']||'ippan';
+      const liveStyle=liveBadgeStyle(arc.liveName||'');
+      return `<div class="archive-card bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
+        <div class="h-1 bg-rose-600/60"></div>
+        <div class="p-4">
+          <div class="flex items-center gap-2 mb-2">
+            <span class="font-bold text-slate-100 flex-1 text-sm truncate">${esc(arc.name)}</span>
+            <span class="text-xs px-2 py-0.5 rounded font-bold flex-shrink-0 bg-rose-950 text-rose-300 border border-rose-800">手動</span>
+            <span class="badge-won px-2 py-0.5 rounded text-xs font-bold flex-shrink-0">参戦済</span>
+          </div>
+          <div class="flex flex-wrap gap-1.5 mb-3">
+            ${arc.liveName?`<span class="live-badge px-1.5 py-0.5 rounded text-xs" style="${liveStyle}">${esc(arc.liveName)}</span>`:''}
+            ${arc.performance?`<span class="perf-badge px-1.5 py-0.5 rounded text-xs">${esc(arc.performance)}</span>`:''}
+            <span class="sb-${seatCls} px-2 py-0.5 rounded text-xs font-bold">${esc(arc.seatType||'一般')}</span>
+          </div>
+          ${arc.comment?`<p class="text-xs text-slate-400 bg-slate-800/50 rounded-lg px-2.5 py-1.5 mb-3 leading-relaxed">${esc(arc.comment)}</p>`:''}
+          <div class="flex items-center justify-between pt-2 border-t border-slate-800/50">
+            <div class="flex items-center gap-1">
+              <span class="text-xs text-slate-600 mr-1">${new Date(arc.addedAt).toLocaleDateString('ja')}</span>
+              <button onclick="openArchiveEditModal('${esc(arc.id)}')"
+                class="text-xs text-slate-500 hover:text-indigo-400 transition px-2 py-1 rounded hover:bg-slate-800 flex items-center gap-1">
+                <i class="fa-solid fa-pen text-xs"></i> 編集
+              </button>
+              <button onclick="deleteManualArchive('${esc(arc.id)}')"
+                class="text-xs text-slate-500 hover:text-red-400 transition px-2 py-1 rounded hover:bg-slate-800 flex items-center gap-1">
+                <i class="fa-solid fa-trash-can text-xs"></i> 削除
+              </button>
+            </div>
+            <button onclick="incrementLike('${esc(arc.id)}')"
+              class="like-btn flex items-center gap-1.5 text-xs text-slate-500 hover:text-rose-400 transition px-2 py-1 rounded hover:bg-slate-800 select-none">
+              <i class="fa-solid fa-heart like-heart text-rose-500/80"></i>
+              <span id="like-count-${esc(arc.id)}">${arc.likes||0}</span>
+            </button>
+          </div>
+        </div>
+      </div>`;
+    }
+  }).join('');
+}
+
+function openCommentModal(memberId){
+  const m=gasMembers.find(x=>x.id===memberId); if(!m) return;
+  document.getElementById('comment-modal-member-id').value=memberId;
+  document.getElementById('comment-modal-text').value=m.comment||'';
+  const info=document.getElementById('comment-modal-member-info');
+  const liveStyle=liveBadgeStyle(m.live||'');
+  const seatCls=SEAT_CLS[m.seatType||'一般']||'ippan';
+  info.innerHTML=`
+    <span class="font-semibold text-slate-100">${esc(m.name)}</span>
+    ${m.live?`<span class="live-badge px-1.5 py-0.5 rounded text-xs" style="${liveStyle}">${esc(m.live)}</span>`:''}
+    ${m.performance?`<span class="perf-badge px-1.5 py-0.5 rounded text-xs">${esc(m.performance)}</span>`:''}
+    <span class="sb-${seatCls} px-2 py-0.5 rounded text-xs font-bold">${esc(m.seatType||'一般')}</span>`;
+  document.getElementById('member-comment-modal').classList.remove('hidden');
+  setTimeout(()=>document.getElementById('comment-modal-text').focus(),200);
+}
+function closeCommentModal(){
+  document.getElementById('member-comment-modal').classList.add('hidden');
+}
+async function submitMemberComment(){
+  const memberId=document.getElementById('comment-modal-member-id').value;
+  const comment=document.getElementById('comment-modal-text').value.trim();
+  const m=gasMembers.find(x=>x.id===memberId); if(!m){ closeCommentModal(); return; }
+  const prevComment=m.comment||'';
+  m.comment=comment;
+  closeCommentModal();
+  renderArchives();
+  toast('感想を保存しました');
+  const r=await postToGas({action:'updateMemberComment',id:memberId,comment});
+  if(!r||(!r.success&&!r.local)){
+    m.comment=prevComment;
+    renderArchives();
+    toast('感想の保存に失敗しました','error');
+  }
+}
+async function incrementMemberLike(memberId){
+  const m=gasMembers.find(x=>x.id===memberId); if(!m) return;
+  m.likes=(m.likes||0)+1;
+  const el=document.getElementById('member-like-count-'+memberId);
+  if(el) el.textContent=m.likes;
+  const r=await postToGas({action:'incrementMemberLike',id:memberId});
+  if(!r||(!r.success&&!r.local)){
+    m.likes=Math.max(0,m.likes-1);
+    if(el) el.textContent=m.likes;
+    toast('いいねの送信に失敗しました','error');
+  }
+}
+async function incrementLike(archiveId){
+  const arc=gasArchives.find(a=>a.id===archiveId); if(!arc) return;
+  arc.likes=(arc.likes||0)+1;
+  const el=document.getElementById('like-count-'+archiveId);
+  if(el) el.textContent=arc.likes;
+  const r=await postToGas({action:'incrementArchiveLike',id:archiveId});
+  if(!r||(!r.success&&!r.local)){
+    arc.likes=Math.max(0,arc.likes-1);
+    if(el) el.textContent=arc.likes;
+    toast('いいねの送信に失敗しました','error');
+  }
+}
+function populateArchiveFormSelects(){
+  const lives=getAllLives();
+  const expired=lives.filter(l=>isLiveExpired(l));
+  const active=lives.filter(l=>!isLiveExpired(l));
+  const sel=document.getElementById('arc-live-select');
+  if(!sel) return;
+  const cur=sel.value;
+  let html='<option value="">-- 選択 --</option>';
+  if(expired.length>0){
+    html+='<optgroup label="終了ライブ">';
+    html+=expired.map(l=>`<option value="${esc(l.name)}"${l.name===cur?' selected':''}>${esc(l.name)}</option>`).join('');
+    html+='</optgroup>';
+  }
+  if(active.length>0){
+    html+='<optgroup label="開催中・予定">';
+    html+=active.map(l=>`<option value="${esc(l.name)}"${l.name===cur?' selected':''}>${esc(l.name)}</option>`).join('');
+    html+='</optgroup>';
+  }
+  html+=`<option value="__other__"${cur==='__other__'?' selected':''}>その他（手入力）</option>`;
+  sel.innerHTML=html;
+  populateArcPerfSelect('');
+}
+function onArcLiveSelectChange(){
+  const sel=document.getElementById('arc-live-select');
+  const other=document.getElementById('arc-live-other');
+  if(!sel||!other) return;
+  other.classList.toggle('hidden',sel.value!=='__other__');
+  if(sel.value==='__other__') setTimeout(()=>other.focus(),50);
+  const liveName=sel.value==='__other__'?'':sel.value;
+  populateArcPerfSelect(liveName);
+}
+function populateArcPerfSelect(liveName){
+  const sel=document.getElementById('arc-perf-select');
+  const other=document.getElementById('arc-perf-other');
+  if(!sel) return;
+  const live=getAllLives().find(l=>l.name===liveName);
+  const perfs=(live&&live.performances)||[];
+  let html='<option value="">-- 選択 --</option>';
+  perfs.forEach(p=>{ html+=`<option value="${esc(p.name)}">${esc(p.name)}</option>`; });
+  html+=`<option value="__other__">その他（手入力）</option>`;
+  sel.innerHTML=html;
+  if(other){ other.value=''; other.classList.add('hidden'); }
+}
+function onArcPerfSelectChange(){
+  const sel=document.getElementById('arc-perf-select');
+  const other=document.getElementById('arc-perf-other');
+  if(!sel||!other) return;
+  other.classList.toggle('hidden',sel.value!=='__other__');
+  if(sel.value==='__other__') setTimeout(()=>other.focus(),50);
+}
+function buildArcSeatBtns(){
+  const cur=document.getElementById('arc-seat')?.value||'一般';
+  const container=document.getElementById('arc-seat-btns');
+  if(!container) return;
+  container.innerHTML=SEAT_TYPES.map(s=>`
+    <button type="button" onclick="selectArcSeat('${s}')" data-arcseat="${s}"
+      class="seat-btn px-4 py-2.5 text-sm font-bold rounded-xl border border-slate-600 text-slate-300 bg-slate-800${cur===s?' active-'+SEAT_CLS[s]:''}">
+      ${esc(s)}
+    </button>
+  `).join('');
+}
+function selectArcSeat(s){
+  document.getElementById('arc-seat').value=s;
+  document.querySelectorAll('[data-arcseat]').forEach(btn=>{
+    const bs=btn.dataset.arcseat;
+    btn.className=`seat-btn px-4 py-2.5 text-sm font-bold rounded-xl border border-slate-600 text-slate-300 bg-slate-800${bs===s?' active-'+SEAT_CLS[bs]:''}`;
+  });
+}
+async function onArchiveFormSubmit(){
+  const name=document.getElementById('arc-name').value.trim();
+  if(!name){ _shake(document.getElementById('arc-name')); toast('お名前を入力してください','error'); return; }
+  const selEl=document.getElementById('arc-live-select');
+  const selVal=selEl?selEl.value:'';
+  const liveName=selVal==='__other__'
+    ?(document.getElementById('arc-live-other')?.value.trim()||'')
+    :selVal;
+  const perfSel=document.getElementById('arc-perf-select');
+  const perfSelVal=perfSel?perfSel.value:'';
+  const performance=perfSelVal==='__other__'
+    ?(document.getElementById('arc-perf-other')?.value.trim()||'')
+    :perfSelVal;
+  const seatType=document.getElementById('arc-seat').value||'一般';
+  const comment=document.getElementById('arc-comment').value.trim();
+  const entry={id:genId('arc'),name,liveName,performance,seatType,comment,likes:0,addedAt:Date.now()};
+  gasArchives.unshift(entry);
+  // フォームリセット
+  document.getElementById('arc-name').value='';
+  if(selEl) selEl.value='';
+  const otherEl=document.getElementById('arc-live-other');
+  if(otherEl){ otherEl.value=''; otherEl.classList.add('hidden'); }
+  if(perfSel) perfSel.value='';
+  const perfOtherEl=document.getElementById('arc-perf-other');
+  if(perfOtherEl){ perfOtherEl.value=''; perfOtherEl.classList.add('hidden'); }
+  document.getElementById('arc-seat').value='一般';
+  buildArcSeatBtns();
+  document.getElementById('arc-comment').value='';
+  renderArchives();
+  toast(`${name} の参戦履歴を追加しました`);
+  const r=await postToGas({action:'addArchive',entry});
+  if(!r||(!r.success&&!r.local)){
+    gasArchives=gasArchives.filter(a=>a.id!==entry.id);
+    renderArchives();
+    toast('登録に失敗しました','error');
+  }
+}
+
+// ============================================================
+// ARCHIVE EDIT / DELETE
+// ============================================================
+function openArchiveEditModal(arcId){
+  const arc=gasArchives.find(a=>a.id===arcId); if(!arc) return;
+  document.getElementById('arc-edit-id').value=arcId;
+  document.getElementById('arc-edit-name').value=arc.name||'';
+  document.getElementById('arc-edit-comment').value=arc.comment||'';
+  populateArchiveEditLiveSelect(arc.liveName||'');
+  buildArchiveEditSeatBtns(arc.seatType||'一般');
+  document.getElementById('archive-edit-modal').classList.remove('hidden');
+}
+function closeArchiveEditModal(){
+  document.getElementById('archive-edit-modal').classList.add('hidden');
+}
+function populateArchiveEditLiveSelect(curLive){
+  const lives=getAllLives();
+  const expired=lives.filter(l=>isLiveExpired(l));
+  const active=lives.filter(l=>!isLiveExpired(l));
+  const sel=document.getElementById('arc-edit-live-select');
+  if(!sel) return;
+  let html='<option value="">-- 選択 --</option>';
+  if(expired.length>0){
+    html+='<optgroup label="終了ライブ">';
+    html+=expired.map(l=>`<option value="${esc(l.name)}"${l.name===curLive?' selected':''}>${esc(l.name)}</option>`).join('');
+    html+='</optgroup>';
+  }
+  if(active.length>0){
+    html+='<optgroup label="開催中・予定">';
+    html+=active.map(l=>`<option value="${esc(l.name)}"${l.name===curLive?' selected':''}>${esc(l.name)}</option>`).join('');
+    html+='</optgroup>';
+  }
+  const isOther=curLive&&!lives.find(l=>l.name===curLive);
+  html+=`<option value="__other__"${isOther?' selected':''}>その他（手入力）</option>`;
+  sel.innerHTML=html;
+  const other=document.getElementById('arc-edit-live-other');
+  if(isOther){ other.value=curLive; other.classList.remove('hidden'); }
+  else { other.value=''; other.classList.add('hidden'); }
+  const arcId=document.getElementById('arc-edit-id').value;
+  const arc=gasArchives.find(a=>a.id===arcId);
+  populateArchiveEditPerfSelect(isOther?'':curLive, arc?.performance||'');
+}
+function onArcEditLiveChange(){
+  const sel=document.getElementById('arc-edit-live-select');
+  const other=document.getElementById('arc-edit-live-other');
+  if(!sel||!other) return;
+  other.classList.toggle('hidden',sel.value!=='__other__');
+  if(sel.value==='__other__') setTimeout(()=>other.focus(),50);
+  populateArchiveEditPerfSelect(sel.value==='__other__'?'':sel.value,'');
+}
+function populateArchiveEditPerfSelect(liveName,curPerf){
+  const sel=document.getElementById('arc-edit-perf-select');
+  const other=document.getElementById('arc-edit-perf-other');
+  if(!sel) return;
+  const live=getAllLives().find(l=>l.name===liveName);
+  const perfs=(live&&live.performances)||[];
+  let html='<option value="">-- 選択 --</option>';
+  perfs.forEach(p=>{ html+=`<option value="${esc(p.name)}"${p.name===curPerf?' selected':''}>${esc(p.name)}</option>`; });
+  const isOther=curPerf&&!perfs.find(p=>p.name===curPerf);
+  html+=`<option value="__other__"${isOther?' selected':''}>その他（手入力）</option>`;
+  sel.innerHTML=html;
+  if(isOther){ other.value=curPerf; other.classList.remove('hidden'); }
+  else { other.value=''; other.classList.add('hidden'); }
+}
+function onArcEditPerfChange(){
+  const sel=document.getElementById('arc-edit-perf-select');
+  const other=document.getElementById('arc-edit-perf-other');
+  if(!sel||!other) return;
+  other.classList.toggle('hidden',sel.value!=='__other__');
+  if(sel.value==='__other__') setTimeout(()=>other.focus(),50);
+}
+function buildArchiveEditSeatBtns(cur='一般'){
+  document.getElementById('arc-edit-seat').value=cur;
+  const container=document.getElementById('arc-edit-seat-btns');
+  if(!container) return;
+  container.innerHTML=SEAT_TYPES.map(s=>`
+    <button type="button" onclick="selectArchiveEditSeat('${s}')" data-editseat="${s}"
+      class="seat-btn px-4 py-2.5 text-sm font-bold rounded-xl border border-slate-600 text-slate-300 bg-slate-800${cur===s?' active-'+SEAT_CLS[s]:''}">
+      ${esc(s)}
+    </button>
+  `).join('');
+}
+function selectArchiveEditSeat(s){
+  document.getElementById('arc-edit-seat').value=s;
+  document.querySelectorAll('[data-editseat]').forEach(btn=>{
+    const bs=btn.dataset.editseat;
+    btn.className=`seat-btn px-4 py-2.5 text-sm font-bold rounded-xl border border-slate-600 text-slate-300 bg-slate-800${bs===s?' active-'+SEAT_CLS[bs]:''}`;
+  });
+}
+async function submitArchiveEdit(){
+  const id=document.getElementById('arc-edit-id').value;
+  const arc=gasArchives.find(a=>a.id===id); if(!arc) return;
+  const name=document.getElementById('arc-edit-name').value.trim();
+  if(!name){ _shake(document.getElementById('arc-edit-name')); toast('お名前を入力してください','error'); return; }
+  const liveSel=document.getElementById('arc-edit-live-select');
+  const liveSelVal=liveSel?liveSel.value:'';
+  const liveName=liveSelVal==='__other__'
+    ?(document.getElementById('arc-edit-live-other')?.value.trim()||'')
+    :liveSelVal;
+  const perfSel=document.getElementById('arc-edit-perf-select');
+  const perfSelVal=perfSel?perfSel.value:'';
+  const performance=perfSelVal==='__other__'
+    ?(document.getElementById('arc-edit-perf-other')?.value.trim()||'')
+    :perfSelVal;
+  const seatType=document.getElementById('arc-edit-seat').value||'一般';
+  const comment=document.getElementById('arc-edit-comment').value.trim();
+  const prev={...arc};
+  Object.assign(arc,{name,liveName,performance,seatType,comment});
+  closeArchiveEditModal();
+  renderArchives();
+  toast('参戦履歴を更新しました');
+  const r=await postToGas({action:'updateArchive',id,name,liveName,performance,seatType,comment});
+  if(!r||(!r.success&&!r.local)){
+    Object.assign(arc,prev);
+    renderArchives();
+    toast('更新に失敗しました','error');
+  }
+}
+async function deleteManualArchive(arcId){
+  if(!confirm('この参戦履歴を削除しますか？')) return;
+  const idx=gasArchives.findIndex(a=>a.id===arcId);
+  if(idx===-1) return;
+  const [removed]=gasArchives.splice(idx,1);
+  renderArchives();
+  toast('参戦履歴を削除しました');
+  const r=await postToGas({action:'deleteArchive',id:arcId});
+  if(!r||(!r.success&&!r.local)){
+    gasArchives.splice(idx,0,removed);
+    renderArchives();
+    toast('削除に失敗しました','error');
+  }
+}
+
+// ============================================================
 // GAS 通信
 // ============================================================
 async function migrateLocalToGas(){
@@ -2286,12 +2912,13 @@ async function fetchFromGas(){
         else gasLives=[...localLives]; // 移行失敗: ローカルを表示維持
       } else { localStorage.setItem(GM_LIVES,'1'); gasLives=[]; }
     } else {
-      gasLives=[];
+      // GASが空を返したが移行済み → ローカルデータを維持（空上書きによるデータ消失を防ぐ）
+      if(!gasLives.length) gasLives=[...(ws.lives||[])];
     }
 
     // ── Matching board ─────────────────────────────────────────────────
     if((data.matching||[]).length>0){
-      gasBoard=data.matching;
+      gasBoard=data.matching.map(e=>({...e,id:String(e.id)}));
       localStorage.setItem(GM_BOARD,'1');
     } else if(!localStorage.getItem(GM_BOARD)){
       const localBoard=ws.matchingBoard||[];
@@ -2305,12 +2932,13 @@ async function fetchFromGas(){
         if(allOk){ localStorage.setItem(GM_BOARD,'1'); toast('掲示板データをGASに移行しました','info'); }
       } else { localStorage.setItem(GM_BOARD,'1'); gasBoard=[]; }
     } else {
-      gasBoard=[];
+      // GASが空を返したが移行済み → ローカルデータを維持
+      if(!gasBoard.length) gasBoard=[...(ws.matchingBoard||[])];
     }
 
     // ── Members ────────────────────────────────────────────────────────
     if((data.members||[]).length>0){
-      gasMembers=data.members;
+      gasMembers=data.members.map(m=>({...m,id:String(m.id)})); // GASの数値IDを文字列に正規化
       localStorage.setItem(GM_MEMBERS,'1');
     } else if(!localStorage.getItem(GM_MEMBERS)){
       const localMembers=ws.members||[];
@@ -2325,7 +2953,14 @@ async function fetchFromGas(){
         // allOk=false の場合フラグをセットしない → 次回起動時にリトライ
       } else { localStorage.setItem(GM_MEMBERS,'1'); gasMembers=[]; }
     } else {
-      gasMembers=[];
+      // GASが空を返したが移行済み → ローカルデータを維持（空上書きによるデータ消失・編集不能を防ぐ）
+      if(!gasMembers.length) gasMembers=[...(ws.members||[])];
+    }
+
+    // ── Archives ──────────────────────────────────────────────────────────
+    if((data.archives||[]).length>0){
+      gasArchives=data.archives.map(a=>({...a,id:String(a.id)}));
+      localStorage.setItem(GM_ARCHIVES,'1');
     }
 
     renderAll();
@@ -2418,8 +3053,14 @@ function bindEvents(){
   document.getElementById('mf-perf')?.addEventListener('change',renderMatchingBoard);
   document.getElementById('mf-hide-done')?.addEventListener('change',renderMatchingBoard);
 
+  // Capture phase: record edit state BEFORE any inline onclick fires (onclick runs at target phase, after capture)
+  let _editBeforeClick='', _matchEditBeforeClick=null;
   document.addEventListener('click',e=>{
-    const editId=document.getElementById('f-edit-id').value; if(!editId) return;
+    _editBeforeClick=document.getElementById('f-edit-id')?.value||'';
+    _matchEditBeforeClick=editingMatchId;
+  },true);
+  document.addEventListener('click',e=>{
+    if(!_editBeforeClick) return;
     const formSec=document.getElementById('form-section');
     const editBarEl=document.getElementById('edit-bar');
     const discardEl=document.getElementById('discard-modal');
@@ -2427,7 +3068,7 @@ function bindEvents(){
     triggerShake();
   });
   document.addEventListener('click',e=>{
-    if(!editingMatchId) return;
+    if(!_matchEditBeforeClick) return;
     const formEl=document.getElementById('match-form-section');
     const barEl=document.getElementById('match-edit-bar');
     if(formEl?.contains(e.target)||barEl?.contains(e.target)) return;
@@ -2446,7 +3087,7 @@ loadState();
 bindEvents();
 buildResultBtns('pending');
 // ローカルデータで即時描画してからGASで上書き
-{const _w=currentWs();gasLives=[..._w.lives];gasMembers=[...(_w.members||[])];gasBoard=[...(_w.matchingBoard||[])];}
+{const _w=currentWs();gasLives=[..._w.lives];gasMembers=(_w.members||[]).map(m=>({...m,id:String(m.id)}));gasBoard=(_w.matchingBoard||[]).map(e=>({...e,id:String(e.id)}));gasArchives=[...(_w.archives||[])];}
 renderAll();
 fetchFromGas();
 </script>
