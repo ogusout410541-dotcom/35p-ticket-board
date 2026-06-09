@@ -1189,7 +1189,10 @@ function loadState(){
   if(migrated){ state=migrated; saveState(); return; }
   state=defaultState();
 }
-function saveState(){ localStorage.setItem(STORAGE_KEY,JSON.stringify(state)); }
+function saveState(){
+  try { localStorage.setItem(STORAGE_KEY,JSON.stringify(state)); }
+  catch(e){ if(e.name==='QuotaExceededError'||e.name==='NS_ERROR_DOM_QUOTA_REACHED') toast('ストレージ容量が不足しています','error'); }
+}
 function currentWs(){ return state.workspaces.find(w=>w.id===state.currentWsId)||state.workspaces[0]; }
 function getMatchBoard(){ const ws=currentWs(); if(!ws.matchingBoard) ws.matchingBoard=[]; return ws.matchingBoard; }
 
@@ -1909,9 +1912,9 @@ function updateSummary(){
 function copyText(){
   const text=document.getElementById('summary-output').textContent;
   if(!text.trim()){ toast('コピーするテキストがありません','error'); return; }
-  navigator.clipboard.writeText(text)
-    .then(()=>toast('クリップボードにコピーしました'))
-    .catch(()=>{ const el=document.getElementById('summary-output'); window.getSelection().selectAllChildren(el); toast('手動でコピーしてください','info'); });
+  const fallback=()=>{ const el=document.getElementById('summary-output'); window.getSelection()?.selectAllChildren(el); toast('手動でコピーしてください','info'); };
+  if(!navigator.clipboard){ fallback(); return; }
+  navigator.clipboard.writeText(text).then(()=>toast('クリップボードにコピーしました')).catch(fallback);
 }
 
 // ============================================================
@@ -2494,9 +2497,9 @@ function copyMatchingSummary(){
     if(wants.length){ lines.push('[求]'); wants.forEach(e=>lines.push(fmtEntry(e))); }
     lines.push('');
   });
-  navigator.clipboard.writeText(lines.join('\n').trimEnd())
-    .then(()=>toast('マッチングサマリーをコピーしました'))
-    .catch(()=>toast('コピーに失敗しました','error'));
+  const txt=lines.join('\n').trimEnd();
+  if(!navigator.clipboard){ toast('クリップボードへのアクセスが許可されていません','error'); return; }
+  navigator.clipboard.writeText(txt).then(()=>toast('マッチングサマリーをコピーしました')).catch(()=>toast('コピーに失敗しました','error'));
 }
 
 // ============================================================
@@ -2634,8 +2637,11 @@ async function submitMemberComment(){
     toast('感想の保存に失敗しました','error');
   }
 }
+const _likePending = new Set();
 async function incrementMemberLike(memberId){
+  if(_likePending.has('m-'+memberId)) return;
   const m=gasMembers.find(x=>x.id===memberId); if(!m) return;
+  _likePending.add('m-'+memberId);
   m.likes=(m.likes||0)+1;
   const el=document.getElementById('member-like-count-'+memberId);
   if(el) el.textContent=m.likes;
@@ -2645,9 +2651,12 @@ async function incrementMemberLike(memberId){
     if(el) el.textContent=m.likes;
     toast('いいねの送信に失敗しました','error');
   }
+  _likePending.delete('m-'+memberId);
 }
 async function incrementLike(archiveId){
+  if(_likePending.has('a-'+archiveId)) return;
   const arc=gasArchives.find(a=>a.id===archiveId); if(!arc) return;
+  _likePending.add('a-'+archiveId);
   arc.likes=(arc.likes||0)+1;
   const el=document.getElementById('like-count-'+archiveId);
   if(el) el.textContent=arc.likes;
@@ -2657,6 +2666,7 @@ async function incrementLike(archiveId){
     if(el) el.textContent=arc.likes;
     toast('いいねの送信に失敗しました','error');
   }
+  _likePending.delete('a-'+archiveId);
 }
 function populateArchiveFormSelects(){
   const lives=getAllLives();
@@ -2885,7 +2895,9 @@ function selectArchiveEditSeat(s){
     btn.className=`seat-btn px-4 py-2.5 text-sm font-bold rounded-xl border border-slate-600 text-slate-300 bg-slate-800${bs===s?' active-'+SEAT_CLS[bs]:''}`;
   });
 }
+let isSubmittingArchiveEdit = false;
 async function submitArchiveEdit(){
+  if(isSubmittingArchiveEdit) return;
   const id=document.getElementById('arc-edit-id').value;
   const arc=gasArchives.find(a=>a.id===id); if(!arc) return;
   const name=document.getElementById('arc-edit-name').value.trim();
@@ -2902,6 +2914,7 @@ async function submitArchiveEdit(){
     :perfSelVal;
   const seatType=document.getElementById('arc-edit-seat').value||'一般';
   const comment=document.getElementById('arc-edit-comment').value.trim();
+  isSubmittingArchiveEdit = true;
   const prev={...arc};
   Object.assign(arc,{name,liveName,performance,seatType,comment});
   closeArchiveEditModal();
@@ -2913,6 +2926,7 @@ async function submitArchiveEdit(){
     renderArchives();
     toast('更新に失敗しました','error');
   }
+  isSubmittingArchiveEdit = false;
 }
 async function deleteManualArchive(arcId){
   if(!confirm('この参戦履歴を削除しますか？')) return;
