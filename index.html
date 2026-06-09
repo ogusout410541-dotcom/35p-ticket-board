@@ -3094,18 +3094,13 @@ async function fetchFromGas(){
   }
 }
 
-// GAS POSTがリダイレクト時にGETへ変化する問題を回避するため、
-// clearLives(全削除) + addLive×N(1件ずつGETで追加) に分割する
+// syncLives 1回のリクエストで削除＋一括書き込みをアトミックに実行
+// GAS側でLockService + setValues により排他制御と高速書き込みを保証
 async function syncLivesToGas(lives){
-  const clearR=await postToGas({action:'clearLives'});
-  if(!clearR) return null;
-  if(clearR.local) return 'local';
-  if(!clearR.success) return false;
-  for(const live of lives){
-    const r=await postToGas({action:'addLive',live});
-    if(!r||!r.success) return false;
-  }
-  return true;
+  const r=await postToGas({action:'syncLives',lives});
+  if(!r) return null;
+  if(r.local) return 'local';
+  return r.success ? true : false;
 }
 
 async function postToGas(payload){
