@@ -1061,6 +1061,7 @@ const LIVE_PALETTE    = ['#6366f1','#ec4899','#f97316','#10b981','#3b82f6','#8b5
 
 let state          = null;
 let settingsDraft  = null;
+let _settingsSnapshot = null;
 let pendingImport  = null;
 let discardTarget  = null;
 let selectedIds    = new Set();
@@ -1264,23 +1265,24 @@ function switchWorkspace(id){
 // SETTINGS
 // ============================================================
 function openSettings(){
-  settingsDraft=JSON.parse(JSON.stringify(currentWs().lives));
+  settingsDraft=JSON.parse(JSON.stringify(getAllLives()));
+  _settingsSnapshot=JSON.stringify(settingsDraft);
   renderSettingsModal();
   document.getElementById('settings-modal').classList.remove('hidden');
 }
-function closeSettings(){ document.getElementById('settings-modal').classList.add('hidden'); settingsDraft=null; }
+function closeSettings(){ document.getElementById('settings-modal').classList.add('hidden'); settingsDraft=null; _settingsSnapshot=null; }
 function confirmCloseSettings(){ if(isSettingsDirty()){ discardTarget='settings'; openDiscardModal(); } else { closeSettings(); } }
-function isSettingsDirty(){ if(!settingsDraft) return false; syncSettingsFromDOM(); return JSON.stringify(settingsDraft)!==JSON.stringify(currentWs().lives); }
+function isSettingsDirty(){ if(!settingsDraft||!_settingsSnapshot) return false; syncSettingsFromDOM(); return JSON.stringify(settingsDraft)!==_settingsSnapshot; }
 function saveSettings(){
   syncSettingsFromDOM();
   const ws=currentWs();
   const cleaned=settingsDraft.map(l=>({...l,name:l.name.trim(),performances:l.performances.map(p=>({...p,name:p.name.trim()}))})).filter(l=>l.name);
   if(cleaned.length===0){ toast('ライブを1つ以上追加してください','error'); return; }
-  ws.lives=cleaned; saveState(); closeSettings(); renderAll();
+  ws.lives=cleaned; gasLives=cleaned; saveState(); closeSettings(); renderAll();
   toast('設定を保存しました');
   postToGas({action:'syncLives',lives:cleaned}).then(r=>{
-    if(r&&r.success&&!r.local){ gasLives=cleaned; toast('ライブ設定をクラウドに同期しました','info'); }
-    else if(r===null){ toast('ライブ設定のクラウド同期に失敗しました','error'); }
+    if(r&&r.success&&!r.local) toast('ライブ設定をクラウドに同期しました','info');
+    else if(r===null) toast('ライブ設定のクラウド同期に失敗しました','error');
   });
 }
 function renderSettingsModal(){
@@ -1917,9 +1919,10 @@ function copyText(){
 // ============================================================
 function exportCSV(){
   const ws=currentWs();
-  if(!ws.members.length){ toast('エクスポートするデータがありません','error'); return; }
+  const members=gasMembers.length?gasMembers:(ws.members||[]);
+  if(!members.length){ toast('エクスポートするデータがありません','error'); return; }
   const header=['名前','ライブ','公演','席種','結果','打ち上げ','宿泊'];
-  const rows=ws.members.map(m=>[
+  const rows=members.map(m=>[
     m.name,m.live||'',m.performance||'',m.seatType||'',
     RESULT_LABEL[m.result]||'',m.afterparty?'○':'',m.accommodation?'○':''
   ].map(v=>`"${String(v).replace(/"/g,'""')}"`).join(','));
@@ -1948,7 +1951,13 @@ function handleImportFile(e){
 function confirmImport(){
   if(!pendingImport) return;
   state=pendingImport; pendingImport=null;
-  saveState(); closeImportModal(); clearSelection(); _doCancelEdit(); renderAll();
+  saveState(); closeImportModal(); clearSelection(); _doCancelEdit();
+  const ws=currentWs();
+  gasLives=[...(ws.lives||[])];
+  gasMembers=(ws.members||[]).map(m=>({...m,id:String(m.id)}));
+  gasBoard=(ws.matchingBoard||[]).map(e=>({...e,id:String(e.id)}));
+  gasArchives=[...(ws.archives||[])];
+  renderAll();
   toast('インポートしました');
 }
 function closeImportModal(){ document.getElementById('import-modal').classList.add('hidden'); pendingImport=null; }
@@ -2439,7 +2448,7 @@ function renderMatchingBoard(){
         ${contactHtml}
         ${e.note?`<p class="text-xs text-slate-400 bg-slate-800/50 rounded-lg px-2.5 py-1.5 mb-2 leading-relaxed">${esc(e.note)}</p>`:''}
         <div class="flex items-center justify-between pt-2 border-t border-slate-800/50">
-          <span class="text-xs text-slate-600">${new Date(e.addedAt).toLocaleDateString('ja')}</span>
+          <span class="text-xs text-slate-600">${e.addedAt?new Date(e.addedAt).toLocaleDateString('ja'):''}</span>
           <div class="flex items-center gap-1">
             <button onclick="startMatchEdit('${esc(e.id)}')"
               class="text-slate-500 hover:text-indigo-400 transition text-xs px-2 py-1 rounded hover:bg-slate-700 flex items-center gap-1">
@@ -2569,7 +2578,7 @@ function renderArchives(){
           ${arc.comment?`<p class="text-xs text-slate-400 bg-slate-800/50 rounded-lg px-2.5 py-1.5 mb-3 leading-relaxed">${esc(arc.comment)}</p>`:''}
           <div class="flex items-center justify-between pt-2 border-t border-slate-800/50">
             <div class="flex items-center gap-1">
-              <span class="text-xs text-slate-600 mr-1">${new Date(arc.addedAt).toLocaleDateString('ja')}</span>
+              <span class="text-xs text-slate-600 mr-1">${arc.addedAt?new Date(arc.addedAt).toLocaleDateString('ja'):''}</span>
               <button onclick="openArchiveEditModal('${esc(arc.id)}')"
                 class="text-xs text-slate-500 hover:text-indigo-400 transition px-2 py-1 rounded hover:bg-slate-800 flex items-center gap-1">
                 <i class="fa-solid fa-pen text-xs"></i> 編集
@@ -2968,7 +2977,9 @@ const GM_LIVES   = 'gas-migrated-lives-v1';
 const GM_BOARD   = 'gas-migrated-board-v1';
 const GM_MEMBERS = 'gas-migrated-members-v1';
 
+let _isFetchingGas = false;
 async function fetchFromGas(){
+  if(_isFetchingGas) return;
   if(!GAS_URL||GAS_URL==='YOUR_GAS_WEB_APP_URL'){
     const ws=currentWs();
     gasLives=[...ws.lives];
@@ -2977,6 +2988,7 @@ async function fetchFromGas(){
     renderAll();
     return;
   }
+  _isFetchingGas = true;
   setMatchLoading(true);
   setMemberLoading(true);
   try {
@@ -3060,6 +3072,7 @@ async function fetchFromGas(){
     if(!gasMembers.length) gasMembers=[...(ws.members||[])];
     renderAll();
   } finally {
+    _isFetchingGas = false;
     setMatchLoading(false);
     setMemberLoading(false);
   }
@@ -3164,6 +3177,11 @@ function bindEvents(){
 
   window.addEventListener('beforeunload',e=>{
     if(document.getElementById('f-edit-id').value){ e.preventDefault(); e.returnValue='編集中の変更が保存されていません。'; }
+  });
+
+  // BFCache（iOS/Chrome 戻る/進む）復帰時にデータを再フェッチ
+  window.addEventListener('pageshow',e=>{
+    if(e.persisted) fetchFromGas();
   });
 }
 
