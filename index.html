@@ -320,7 +320,7 @@ main { padding-bottom: max(10rem, calc(8rem + env(safe-area-inset-bottom, 0px)))
     </div>
     <div class="overflow-y-auto flex-1 p-5 flex flex-col gap-3">
       <input type="hidden" id="arc-edit-id">
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <div>
           <label class="block text-xs text-slate-400 mb-1.5">お名前 <span class="text-red-400">*</span></label>
           <input id="arc-edit-name" type="text" autocomplete="off"
@@ -407,19 +407,19 @@ main { padding-bottom: max(10rem, calc(8rem + env(safe-area-inset-bottom, 0px)))
 <!-- ===== TAB NAV ===== -->
 <div class="bg-slate-900/90 border-b border-slate-800 backdrop-blur-sm sticky top-[56px] z-30">
   <div class="max-w-7xl mx-auto px-3 sm:px-6">
-    <div class="flex">
+    <div class="flex overflow-x-auto filter-scroll-row">
       <button id="tab-manager" onclick="switchTab('manager')"
-        class="nav-tab active-tab flex items-center gap-2 px-5 py-3 text-sm font-semibold">
+        class="nav-tab active-tab flex items-center gap-2 px-4 sm:px-5 py-3 text-sm font-semibold flex-shrink-0">
         <i class="fa-solid fa-ticket-simple"></i>
         <span>当落管理</span>
       </button>
       <button id="tab-matching" onclick="switchTab('matching')"
-        class="nav-tab flex items-center gap-2 px-5 py-3 text-sm font-semibold">
+        class="nav-tab flex items-center gap-2 px-4 sm:px-5 py-3 text-sm font-semibold flex-shrink-0">
         <i class="fa-solid fa-arrows-left-right"></i>
         <span>マッチングボード</span>
       </button>
       <button id="tab-archives" onclick="switchTab('archives')"
-        class="nav-tab flex items-center gap-2 px-5 py-3 text-sm font-semibold">
+        class="nav-tab flex items-center gap-2 px-4 sm:px-5 py-3 text-sm font-semibold flex-shrink-0">
         <i class="fa-solid fa-book-open"></i>
         <span>参戦履歴</span>
       </button>
@@ -451,7 +451,7 @@ main { padding-bottom: max(10rem, calc(8rem + env(safe-area-inset-bottom, 0px)))
       </div>
       <div>
         <label class="block text-xs text-slate-400 mb-1.5">ライブ</label>
-        <select id="f-live"
+        <select id="f-live" onchange="updatePerfSelect()"
           class="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-sm text-slate-200 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"></select>
       </div>
       <div>
@@ -659,8 +659,8 @@ main { padding-bottom: max(10rem, calc(8rem + env(safe-area-inset-bottom, 0px)))
     <!-- 感想 -->
     <div class="mb-3">
       <label class="block text-xs text-slate-400 mb-1.5">一言感想 <span class="text-slate-500 text-xs">(任意)</span></label>
-      <input id="arc-comment" type="text" placeholder="最高の参戦でした！"
-        class="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-rose-500 focus:ring-1 focus:ring-rose-500">
+      <textarea id="arc-comment" rows="2" placeholder="最高の参戦でした！"
+        class="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-rose-500 focus:ring-1 focus:ring-rose-500 resize-none"></textarea>
     </div>
     <button onclick="onArchiveFormSubmit()"
       class="w-full bg-rose-700 hover:bg-rose-600 text-white py-3 rounded-xl transition font-bold text-sm flex items-center justify-center gap-2">
@@ -1204,7 +1204,7 @@ function switchTab(tab){
   document.getElementById('tab-matching').classList.toggle('active-tab',tab==='matching');
   document.getElementById('tab-archives').classList.toggle('active-tab',tab==='archives');
   if(tab==='matching'){ populateMatchingFormSelects(); renderMatchingBoard(); fetchFromGas(); }
-  if(tab==='archives'){ populateArchiveFormSelects(); buildArcSeatBtns(); renderArchives(); }
+  if(tab==='archives'){ populateArchiveFormSelects(); buildArcSeatBtns(); renderArchives(); fetchFromGas(); }
 }
 
 // ============================================================
@@ -1313,7 +1313,7 @@ function renderSettingsModal(){
         <span class="text-xs text-slate-500 flex-shrink-0">強制終演</span>
         <label class="relative inline-flex items-center cursor-pointer flex-shrink-0">
           <input type="checkbox" class="live-manualended-input sr-only peer" ${live.manualEnded?'checked':''}>
-          <div class="w-9 h-5 bg-slate-600 peer-focus:outline-none rounded-full peer peer-checked:bg-rose-600 after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-4"></div>
+          <div class="relative w-9 h-5 bg-slate-600 peer-focus:outline-none rounded-full peer peer-checked:bg-rose-600 after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-4"></div>
         </label>
         <span class="text-xs text-slate-600 italic">ONで即終了扱い（日付に関わらず）</span>
       </div>
@@ -1452,27 +1452,33 @@ function getOption(type){
 // MEMBER FORM
 // ============================================================
 function populateFormSelects(){
-  const lives=getActiveLives(); // 終了ライブはフォームに表示しない
+  const lives=getActiveLives();
   const liveEl=document.getElementById('f-live');
+  if (document.activeElement === liveEl) return;
   const selLive=liveEl.value;
   liveEl.innerHTML='<option value="">-- 選択 --</option>'+
-    lives.map(l=>`<option value="${esc(l.name)}"${l.name===selLive?'selected':''}>${esc(l.name)}</option>`).join('');
+    lives.map(l=>`<option value="${esc(l.name)}"${l.name===selLive?' selected':''}>${esc(l.name)}</option>`).join('');
+  liveEl.value = selLive;
   updatePerfSelect();
   buildSeatBtns();
 }
 function updatePerfSelect(){
-  const lives=getActiveLives(); // 終了ライブは除外
-  const liveName=document.getElementById('f-live').value;
   const perfEl=document.getElementById('f-perf');
+  if (document.activeElement === perfEl) return;
+  const lives=getActiveLives();
+  const liveName=document.getElementById('f-live').value;
   const selPerf=perfEl.value;
   const live=lives.find(l=>l.name===liveName);
   perfEl.innerHTML='<option value="">-- 選択 --</option>'+
-    (live?live.performances:[]).map(p=>{
+    (live?.performances||[]).map(p=>{
       const ds=fmtPerfDate(p);
-      return `<option value="${esc(p.name)}"${p.name===selPerf?'selected':''}>${esc(p.name)}${ds?' ('+ds+')':''}</option>`;
+      return `<option value="${esc(p.name)}"${p.name===selPerf?' selected':''}>${esc(p.name)}${ds?' ('+ds+')':''}</option>`;
     }).join('');
+  perfEl.value = selPerf;
 }
+let isSubmittingMember = false; // 連打防止フラグ
 async function onFormSubmit(){
+  if(isSubmittingMember) return;
   const name=document.getElementById('f-name').value.trim();
   if(!name){ _shake(document.getElementById('f-name')); toast('お名前を入力してください','error'); return; }
   const editId=document.getElementById('f-edit-id').value;
@@ -1486,22 +1492,8 @@ async function onFormSubmit(){
     afterparty:getOption('afterparty'),
     accommodation:getOption('accommodation')
   };
-  if(editId){
-    const m=gasMembers.find(x=>x.id===editId);
-    if(!m) return;
-    const prev={...m};
-    Object.assign(m,data);
-    _doCancelEdit();
-    renderAll();
-    toast(`${name} を更新しました`);
-    if(isGasEnabled()){
-      const r=await postToGas({action:'updateMember',entry:{...m}});
-      if(!r||(!r.success&&!r.local)){ Object.assign(m,prev); renderAll(); toast('更新に失敗しました','error'); }
-    } else {
-      ws.members=[...gasMembers]; saveState();
-    }
-  } else {
-    // 重複チェック: 同一 名前・ライブ・公演 の組み合わせが既に存在する場合は拒否
+
+  if(!editId){
     const dupLive=data.live||''; const dupPerf=data.performance||'';
     const isDup=gasMembers.some(m=>m.name===name&&(m.live||'')=== dupLive&&(m.performance||'')=== dupPerf);
     if(isDup){
@@ -1509,21 +1501,47 @@ async function onFormSubmit(){
       toast(`「${name}」は${dupLive?dupLive+'・':''}${dupPerf||'同一公演'}で既に登録済みです`,'error');
       return;
     }
-    const entry={id:genId('mem'),...data,addedAt:Date.now(),sortOrder:gasMembers.length};
-    gasMembers.push(entry);
-    document.getElementById('f-name').value='';
-    buildResultBtns('pending');
-    setOption('afterparty',false);
-    setOption('accommodation',false);
-    document.getElementById('f-name').focus();
-    renderAll();
-    toast(`${name} を追加しました`);
-    if(isGasEnabled()){
-      const r=await postToGas({action:'addMember',entry});
-      if(!r||(!r.success&&!r.local)){ gasMembers=gasMembers.filter(x=>x.id!==entry.id); renderAll(); toast('登録に失敗しました','error'); }
+  }
+
+  isSubmittingMember = true;
+  const btn = document.getElementById('form-submit-btn');
+  if(btn) { btn.style.pointerEvents = 'none'; btn.style.opacity = '0.5'; }
+
+  try {
+    if(editId){
+      const m=gasMembers.find(x=>x.id===editId);
+      if(!m) return;
+      const prev={...m};
+      Object.assign(m,data);
+      _doCancelEdit();
+      renderAll();
+      toast(`${name} を更新しました`);
+      if(isGasEnabled()){
+        const r=await postToGas({action:'updateMember',entry:{...m}});
+        if(!r||(!r.success&&!r.local)){ Object.assign(m,prev); renderAll(); toast('更新に失敗しました','error'); }
+      } else {
+        ws.members=[...gasMembers]; saveState();
+      }
     } else {
-      ws.members=[...gasMembers]; saveState();
+      const entry={id:genId('mem'),...data,addedAt:Date.now(),sortOrder:gasMembers.length};
+      gasMembers.push(entry);
+      document.getElementById('f-name').value='';
+      buildResultBtns('pending');
+      setOption('afterparty',false);
+      setOption('accommodation',false);
+      document.getElementById('f-name').focus();
+      renderAll();
+      toast(`${name} を追加しました`);
+      if(isGasEnabled()){
+        const r=await postToGas({action:'addMember',entry});
+        if(!r||(!r.success&&!r.local)){ gasMembers=gasMembers.filter(x=>x.id!==entry.id); renderAll(); toast('登録に失敗しました','error'); }
+      } else {
+        ws.members=[...gasMembers]; saveState();
+      }
     }
+  } finally {
+    isSubmittingMember = false;
+    if(btn) { btn.style.pointerEvents = 'auto'; btn.style.opacity = '1'; }
   }
 }
 let _pendingEditId=null;
@@ -1648,12 +1666,15 @@ function renderFilterOptions(){
   const lives=gasLives.length>0?gasLives:ws.lives;
   const flLive=document.getElementById('filter-live');
   const flPerf=document.getElementById('filter-perf');
+  if (document.activeElement === flLive || document.activeElement === flPerf) return;
   const selLive=flLive.value, selPerf=flPerf.value;
   flLive.innerHTML='<option value="">全ライブ</option>'+
-    lives.map(l=>`<option value="${esc(l.name)}"${l.name===selLive?'selected':''}>${esc(l.name)}</option>`).join('');
-  const lv=lives.find(l=>l.name===flLive.value);
+    lives.map(l=>`<option value="${esc(l.name)}"${l.name===selLive?' selected':''}>${esc(l.name)}</option>`).join('');
+  flLive.value = selLive;
+  const lv=lives.find(l=>l.name===selLive);
   flPerf.innerHTML='<option value="">全公演</option>'+
-    (lv?lv.performances:[]).map(p=>`<option value="${esc(p.name)}"${p.name===selPerf?'selected':''}>${esc(p.name)}</option>`).join('');
+    (lv?.performances||[]).map(p=>`<option value="${esc(p.name)}"${p.name===selPerf?' selected':''}>${esc(p.name)}</option>`).join('');
+  flPerf.value = selPerf;
 }
 function getFiltered(){
   const ws=currentWs();
@@ -1965,52 +1986,60 @@ function saveEditFromBar(){
 // MATCHING BOARD
 // ============================================================
 function updateMfPerfOptions(){
-  const lives=getActiveLives(); // 終了ライブのフィルターは非表示
+  const lives=getActiveLives();
   const mfLiveVal=document.getElementById('mf-live')?.value||'';
   const mfPerf=document.getElementById('mf-perf'); if(!mfPerf) return;
+  if (document.activeElement === mfPerf) return;
   const selPerf=mfPerf.value;
   const live=lives.find(l=>l.name===mfLiveVal);
   mfPerf.innerHTML='<option value="">全公演</option>'+
-    (live?live.performances:[]).map(p=>`<option value="${esc(p.name)}"${p.name===selPerf?'selected':''}>${esc(p.name)}</option>`).join('');
+    (live?.performances||[]).map(p=>`<option value="${esc(p.name)}"${p.name===selPerf?' selected':''}>${esc(p.name)}</option>`).join('');
+  mfPerf.value = selPerf;
 }
 function populateMatchingFormSelects(){
   const ws=currentWs();
-  const activeLives=getActiveLives(); // 終了ライブは募集フォームとフィルターから除外
+  const activeLives=getActiveLives();
   const dl=document.getElementById('member-names-list');
   if(dl){
     const names=[...new Set(ws.members.map(m=>m.name))];
     dl.innerHTML=names.map(n=>`<option value="${esc(n)}">`).join('');
   }
   const ml=document.getElementById('m-live'); if(!ml) return;
+  if (document.activeElement === ml) return;
   const selLive=ml.value;
   ml.innerHTML='<option value="">-- ライブ --</option>'+
-    activeLives.map(l=>`<option value="${esc(l.name)}"${l.name===selLive?'selected':''}>${esc(l.name)}</option>`).join('');
+    activeLives.map(l=>`<option value="${esc(l.name)}"${l.name===selLive?' selected':''}>${esc(l.name)}</option>`).join('');
+  ml.value = selLive;
   updateMatchPerfSelect();
   buildMatchSeatBtns(document.getElementById('m-seat')?.value||'一般');
   const mfLive=document.getElementById('mf-live');
   if(mfLive){
+    if (document.activeElement === mfLive) return;
     const sel=mfLive.value;
     mfLive.innerHTML='<option value="">全ライブ</option>'+
-      activeLives.map(l=>`<option value="${esc(l.name)}"${l.name===sel?'selected':''}>${esc(l.name)}</option>`).join('');
+      activeLives.map(l=>`<option value="${esc(l.name)}"${l.name===sel?' selected':''}>${esc(l.name)}</option>`).join('');
+    mfLive.value = sel;
   }
   updateMfPerfOptions();
 }
 function updateMatchPerfSelect(){
-  const lives=getActiveLives(); // 終了ライブは除外
+  const lives=getActiveLives();
   const type=document.getElementById('m-type')?.value||'give';
   const isWant=type==='want';
   const liveName=document.getElementById('m-live')?.value;
   const mp=document.getElementById('m-perf'); if(!mp) return;
+  if (document.activeElement === mp) return;
   const selPerf=mp.value;
   const live=lives.find(l=>l.name===liveName);
   const firstOpt=isWant
     ? `<option value="">指定なし（全公演対象）</option>`
     : `<option value="">-- 公演 --</option>`;
   mp.innerHTML=firstOpt+
-    (live?live.performances:[]).map(p=>{
+    (live?.performances||[]).map(p=>{
       const ds=fmtPerfDate(p);
-      return `<option value="${esc(p.name)}"${p.name===selPerf?'selected':''}>${esc(p.name)}${ds?' ('+ds+')':''}</option>`;
+      return `<option value="${esc(p.name)}"${p.name===selPerf?' selected':''}>${esc(p.name)}${ds?' ('+ds+')':''}</option>`;
     }).join('');
+  mp.value = selPerf;
   applyLiveGuide();
 }
 function applyLiveGuide(){
@@ -2189,7 +2218,9 @@ function cancelMatchEdit(){
   document.getElementById('match-edit-bar')?.classList.add('hidden');
 }
 
+let isSubmittingMatch = false; // 連打防止フラグ
 async function addMatchingEntry(){
+  if(isSubmittingMatch) return;
   const nameEl=document.getElementById('m-name');
   const name=nameEl?.value.trim();
   if(!name){ _shake(nameEl); toast('お名前を入力してください','error'); return; }
@@ -2228,40 +2259,60 @@ async function addMatchingEntry(){
     contact:document.getElementById('m-contact')?.value.trim()||'',
     note:document.getElementById('m-note').value.trim(),
   };
-  if(editingMatchId){
-    const idx=gasBoard.findIndex(e=>e.id===editingMatchId);
-    if(idx<0){ toast('エントリーが見つかりません','error'); cancelMatchEdit(); return; }
-    const prev={...gasBoard[idx]};
-    const updated={...gasBoard[idx],...entryData};
-    gasBoard[idx]=updated;
-    cancelMatchEdit(); renderMatchingBoard();
-    toast(`${name} のエントリーを更新しました`);
-    const result=await postToGas({action:'updateMatch',entry:updated});
-    if(!result||(!result.success&&!result.local)){ gasBoard[idx]=prev; renderMatchingBoard(); toast('更新に失敗しました','error'); }
-    return;
+
+  // 重複チェック（マッチングボード用）
+  if(!editingMatchId){
+    const isDup = gasBoard.some(e => e.name===name && e.type===entryData.type && e.live===entryData.live && e.performance===entryData.performance);
+    if(isDup){
+      _shake(nameEl);
+      toast('同じ内容のチケットが既に登録されています','error');
+      return;
+    }
   }
-  const entry={id:genId('match'),...entryData,addedAt:Date.now()};
-  gasBoard.push(entry);
-  nameEl.value='';
-  document.getElementById('m-note').value='';
-  const contactEl=document.getElementById('m-contact'); if(contactEl) contactEl.value='';
-  matchCount=1;
-  const disp=document.getElementById('m-count-display'), inp=document.getElementById('m-count');
-  if(disp) disp.textContent='1'; if(inp) inp.value='1';
-  selectMatchTag('mg-status','open');
-  selectMatchTag('mg-fc','general');
-  selectMatchTag('mg-priority','first');
-  selectMatchTag('mg-price','consult');
-  selectMatchTag('mg-transfer','app');
-  selectMatchTag('mg-settlement','prepay');
-  const poEl=document.getElementById('m-priority-other'); if(poEl) poEl.value='';
-  const powEl=document.getElementById('m-priority-other-wrap'); if(powEl) powEl.classList.add('hidden');
-  buildMatchSeatBtns('一般');
-  updateMatchPerfSelect();
-  renderMatchingBoard();
-  toast(`${name} の${entry.type==='give'?'譲':'求'}チケットを登録しました`);
-  const result=await postToGas({action:'addMatch',entry});
-  if(!result||(!result.success&&!result.local)){ gasBoard=gasBoard.filter(e=>e.id!==entry.id); renderMatchingBoard(); toast('登録に失敗しました','error'); }
+
+  isSubmittingMatch = true;
+  const btn = document.getElementById('m-submit-btn');
+  if(btn) { btn.style.pointerEvents = 'none'; btn.style.opacity = '0.5'; }
+
+  try {
+    if(editingMatchId){
+      const idx=gasBoard.findIndex(e=>e.id===editingMatchId);
+      if(idx<0){ toast('エントリーが見つかりません','error'); cancelMatchEdit(); return; }
+      const prev={...gasBoard[idx]};
+      const updated={...gasBoard[idx],...entryData};
+      gasBoard[idx]=updated;
+      cancelMatchEdit(); renderMatchingBoard();
+      toast(`${name} のエントリーを更新しました`);
+      const result=await postToGas({action:'updateMatch',entry:updated});
+      if(!result||(!result.success&&!result.local)){ gasBoard[idx]=prev; renderMatchingBoard(); toast('更新に失敗しました','error'); }
+      return;
+    }
+    const entry={id:genId('match'),...entryData,addedAt:Date.now()};
+    gasBoard.push(entry);
+    nameEl.value='';
+    document.getElementById('m-note').value='';
+    const contactEl=document.getElementById('m-contact'); if(contactEl) contactEl.value='';
+    matchCount=1;
+    const disp=document.getElementById('m-count-display'), inp=document.getElementById('m-count');
+    if(disp) disp.textContent='1'; if(inp) inp.value='1';
+    selectMatchTag('mg-status','open');
+    selectMatchTag('mg-fc','general');
+    selectMatchTag('mg-priority','first');
+    selectMatchTag('mg-price','consult');
+    selectMatchTag('mg-transfer','app');
+    selectMatchTag('mg-settlement','prepay');
+    const poEl=document.getElementById('m-priority-other'); if(poEl) poEl.value='';
+    const powEl=document.getElementById('m-priority-other-wrap'); if(powEl) powEl.classList.add('hidden');
+    buildMatchSeatBtns('一般');
+    updateMatchPerfSelect();
+    renderMatchingBoard();
+    toast(`${name} の${entry.type==='give'?'譲':'求'}チケットを登録しました`);
+    const result=await postToGas({action:'addMatch',entry});
+    if(!result||(!result.success&&!result.local)){ gasBoard=gasBoard.filter(e=>e.id!==entry.id); renderMatchingBoard(); toast('登録に失敗しました','error'); }
+  } finally {
+    isSubmittingMatch = false;
+    if(btn) { btn.style.pointerEvents = 'auto'; btn.style.opacity = '1'; }
+  }
 }
 async function deleteMatchingEntry(id){
   const entry=gasBoard.find(e=>e.id===id); if(!entry) return;
@@ -2297,6 +2348,7 @@ function renderMatchingBoard(){
   const container=document.getElementById('matching-list');
   const emptyEl=document.getElementById('matching-empty');
   if(!container) return;
+  container.innerHTML='';
 
   if(filtered.length===0){
     container.innerHTML='';
@@ -2445,6 +2497,7 @@ function renderArchives(){
   const container=document.getElementById('archives-list');
   const emptyEl=document.getElementById('archives-empty');
   if(!container) return;
+  container.innerHTML='';
   const lives=getAllLives();
   // ① 自動移行: endDate過ぎたライブのメンバー
   const autoMembers=gasMembers.filter(m=>{ const lv=lives.find(l=>l.name===m.live); return lv&&isLiveExpired(lv); });
@@ -2602,7 +2655,10 @@ function populateArchiveFormSelects(){
   const active=lives.filter(l=>!isLiveExpired(l));
   const sel=document.getElementById('arc-live-select');
   if(!sel) return;
+  if (document.activeElement === sel) return;
   const cur=sel.value;
+  const perfSel=document.getElementById('arc-perf-select');
+  const curPerf=perfSel?perfSel.value:'';
   let html='<option value="">-- 選択 --</option>';
   if(expired.length>0){
     html+='<optgroup label="終了ライブ">';
@@ -2616,7 +2672,10 @@ function populateArchiveFormSelects(){
   }
   html+=`<option value="__other__"${cur==='__other__'?' selected':''}>その他（手入力）</option>`;
   sel.innerHTML=html;
-  populateArcPerfSelect('');
+  sel.value = cur;
+  const liveName=cur==='__other__'?'':cur;
+  populateArcPerfSelect(liveName);
+  if(perfSel&&curPerf) perfSel.value=curPerf;
 }
 function onArcLiveSelectChange(){
   const sel=document.getElementById('arc-live-select');
@@ -2631,13 +2690,19 @@ function populateArcPerfSelect(liveName){
   const sel=document.getElementById('arc-perf-select');
   const other=document.getElementById('arc-perf-other');
   if(!sel) return;
+  if (document.activeElement === sel) return;
+  const curPerf = sel.value;
   const live=getAllLives().find(l=>l.name===liveName);
   const perfs=(live&&live.performances)||[];
   let html='<option value="">-- 選択 --</option>';
-  perfs.forEach(p=>{ html+=`<option value="${esc(p.name)}">${esc(p.name)}</option>`; });
-  html+=`<option value="__other__">その他（手入力）</option>`;
+  perfs.forEach(p=>{ html+=`<option value="${esc(p.name)}"${p.name===curPerf?' selected':''}>${esc(p.name)}</option>`; });
+  html+=`<option value="__other__"${curPerf==='__other__'?' selected':''}>その他（手入力）</option>`;
   sel.innerHTML=html;
-  if(other){ other.value=''; other.classList.add('hidden'); }
+  sel.value = curPerf;
+  if(other){
+    other.classList.toggle('hidden', sel.value !== '__other__');
+    if (sel.value !== '__other__') other.value = '';
+  }
 }
 function onArcPerfSelectChange(){
   const sel=document.getElementById('arc-perf-select');
@@ -2664,7 +2729,9 @@ function selectArcSeat(s){
     btn.className=`seat-btn px-4 py-2.5 text-sm font-bold rounded-xl border border-slate-600 text-slate-300 bg-slate-800${bs===s?' active-'+SEAT_CLS[bs]:''}`;
   });
 }
+let isSubmittingArchive = false; // 連打防止フラグ
 async function onArchiveFormSubmit(){
+  if(isSubmittingArchive) return;
   const name=document.getElementById('arc-name').value.trim();
   if(!name){ _shake(document.getElementById('arc-name')); toast('お名前を入力してください','error'); return; }
   const selEl=document.getElementById('arc-live-select');
@@ -2679,26 +2746,40 @@ async function onArchiveFormSubmit(){
     :perfSelVal;
   const seatType=document.getElementById('arc-seat').value||'一般';
   const comment=document.getElementById('arc-comment').value.trim();
-  const entry={id:genId('arc'),name,liveName,performance,seatType,comment,likes:0,addedAt:Date.now()};
-  gasArchives.unshift(entry);
-  // フォームリセット
-  document.getElementById('arc-name').value='';
-  if(selEl) selEl.value='';
-  const otherEl=document.getElementById('arc-live-other');
-  if(otherEl){ otherEl.value=''; otherEl.classList.add('hidden'); }
-  if(perfSel) perfSel.value='';
-  const perfOtherEl=document.getElementById('arc-perf-other');
-  if(perfOtherEl){ perfOtherEl.value=''; perfOtherEl.classList.add('hidden'); }
-  document.getElementById('arc-seat').value='一般';
-  buildArcSeatBtns();
-  document.getElementById('arc-comment').value='';
-  renderArchives();
-  toast(`${name} の参戦履歴を追加しました`);
-  const r=await postToGas({action:'addArchive',entry});
-  if(!r||(!r.success&&!r.local)){
-    gasArchives=gasArchives.filter(a=>a.id!==entry.id);
+
+  // 重複チェック（参戦履歴用）
+  const isDup = gasArchives.some(a => a.name===name && (a.liveName||'')===liveName && (a.performance||'')===performance);
+  if(isDup){
+    _shake(document.getElementById('arc-name'));
+    toast('同じ参戦履歴が既に登録されています','error');
+    return;
+  }
+
+  isSubmittingArchive = true;
+  try {
+    const entry={id:genId('arc'),name,liveName,performance,seatType,comment,likes:0,addedAt:Date.now()};
+    gasArchives.unshift(entry);
+    // フォームリセット
+    document.getElementById('arc-name').value='';
+    if(selEl) selEl.value='';
+    const otherEl=document.getElementById('arc-live-other');
+    if(otherEl){ otherEl.value=''; otherEl.classList.add('hidden'); }
+    if(perfSel) perfSel.value='';
+    const perfOtherEl=document.getElementById('arc-perf-other');
+    if(perfOtherEl){ perfOtherEl.value=''; perfOtherEl.classList.add('hidden'); }
+    document.getElementById('arc-seat').value='一般';
+    buildArcSeatBtns();
+    document.getElementById('arc-comment').value='';
     renderArchives();
-    toast('登録に失敗しました','error');
+    toast(`${name} の参戦履歴を追加しました`);
+    const r=await postToGas({action:'addArchive',entry});
+    if(!r||(!r.success&&!r.local)){
+      gasArchives=gasArchives.filter(a=>a.id!==entry.id);
+      renderArchives();
+      toast('登録に失敗しました','error');
+    }
+  } finally {
+    isSubmittingArchive = false;
   }
 }
 
@@ -2723,6 +2804,7 @@ function populateArchiveEditLiveSelect(curLive){
   const active=lives.filter(l=>!isLiveExpired(l));
   const sel=document.getElementById('arc-edit-live-select');
   if(!sel) return;
+  if (document.activeElement === sel) return;
   let html='<option value="">-- 選択 --</option>';
   if(expired.length>0){
     html+='<optgroup label="終了ライブ">';
@@ -2737,6 +2819,7 @@ function populateArchiveEditLiveSelect(curLive){
   const isOther=curLive&&!lives.find(l=>l.name===curLive);
   html+=`<option value="__other__"${isOther?' selected':''}>その他（手入力）</option>`;
   sel.innerHTML=html;
+  sel.value = isOther ? '__other__' : curLive;
   const other=document.getElementById('arc-edit-live-other');
   if(isOther){ other.value=curLive; other.classList.remove('hidden'); }
   else { other.value=''; other.classList.add('hidden'); }
@@ -2756,6 +2839,7 @@ function populateArchiveEditPerfSelect(liveName,curPerf){
   const sel=document.getElementById('arc-edit-perf-select');
   const other=document.getElementById('arc-edit-perf-other');
   if(!sel) return;
+  if (document.activeElement === sel) return;
   const live=getAllLives().find(l=>l.name===liveName);
   const perfs=(live&&live.performances)||[];
   let html='<option value="">-- 選択 --</option>';
@@ -2763,6 +2847,7 @@ function populateArchiveEditPerfSelect(liveName,curPerf){
   const isOther=curPerf&&!perfs.find(p=>p.name===curPerf);
   html+=`<option value="__other__"${isOther?' selected':''}>その他（手入力）</option>`;
   sel.innerHTML=html;
+  sel.value = isOther ? '__other__' : curPerf;
   if(isOther){ other.value=curPerf; other.classList.remove('hidden'); }
   else { other.value=''; other.classList.add('hidden'); }
 }
@@ -2901,18 +2986,26 @@ async function fetchFromGas(){
     const ws=currentWs();
 
     // ── Lives ──────────────────────────────────────────────────────────
+    // 【修正】GASから文字列として送られてきた公演データ(performances)を正しく復元する
+    const normLives=l=>{
+      let p = l.performances;
+      if (typeof p === 'string') {
+        try { p = JSON.parse(p); } catch(e) { p = []; }
+      }
+      return {...l, performances: Array.isArray(p) ? p : []};
+    };
+
     if((data.lives||[]).length>0){
-      gasLives=data.lives;
+      gasLives=data.lives.map(normLives);
       localStorage.setItem(GM_LIVES,'1');
     } else if(!localStorage.getItem(GM_LIVES)){
       const localLives=ws.lives||[];
       if(localLives.length>0){
         const r=await postToGas({action:'syncLives',lives:localLives});
         if(r&&r.success&&!r.local){ gasLives=[...localLives]; localStorage.setItem(GM_LIVES,'1'); toast('ライブデータをGASに移行しました','info'); }
-        else gasLives=[...localLives]; // 移行失敗: ローカルを表示維持
+        else gasLives=[...localLives];
       } else { localStorage.setItem(GM_LIVES,'1'); gasLives=[]; }
     } else {
-      // GASが空を返したが移行済み → ローカルデータを維持（空上書きによるデータ消失を防ぐ）
       if(!gasLives.length) gasLives=[...(ws.lives||[])];
     }
 
@@ -2932,13 +3025,12 @@ async function fetchFromGas(){
         if(allOk){ localStorage.setItem(GM_BOARD,'1'); toast('掲示板データをGASに移行しました','info'); }
       } else { localStorage.setItem(GM_BOARD,'1'); gasBoard=[]; }
     } else {
-      // GASが空を返したが移行済み → ローカルデータを維持
       if(!gasBoard.length) gasBoard=[...(ws.matchingBoard||[])];
     }
 
     // ── Members ────────────────────────────────────────────────────────
     if((data.members||[]).length>0){
-      gasMembers=data.members.map(m=>({...m,id:String(m.id)})); // GASの数値IDを文字列に正規化
+      gasMembers=data.members.map(m=>({...m,id:String(m.id)}));
       localStorage.setItem(GM_MEMBERS,'1');
     } else if(!localStorage.getItem(GM_MEMBERS)){
       const localMembers=ws.members||[];
@@ -2950,23 +3042,18 @@ async function fetchFromGas(){
         }
         gasMembers=[...localMembers];
         if(allOk){ localStorage.setItem(GM_MEMBERS,'1'); toast('メンバーデータをGASに移行しました','info'); }
-        // allOk=false の場合フラグをセットしない → 次回起動時にリトライ
       } else { localStorage.setItem(GM_MEMBERS,'1'); gasMembers=[]; }
     } else {
-      // GASが空を返したが移行済み → ローカルデータを維持（空上書きによるデータ消失・編集不能を防ぐ）
       if(!gasMembers.length) gasMembers=[...(ws.members||[])];
     }
 
     // ── Archives ──────────────────────────────────────────────────────────
-    if((data.archives||[]).length>0){
-      gasArchives=data.archives.map(a=>({...a,id:String(a.id)}));
-      localStorage.setItem(GM_ARCHIVES,'1');
-    }
+    gasArchives=(data.archives||[]).map(a=>({...a,id:String(a.id)}));
+    if(gasArchives.length>0) localStorage.setItem(GM_ARCHIVES,'1');
 
     renderAll();
   } catch(err){
     toast('データの取得に失敗しました: '+err.message,'error');
-    // フェッチ失敗時はローカルデータで代用（画面をクリアしない）
     const ws=currentWs();
     if(!gasLives.length)   gasLives=[...ws.lives];
     if(!gasBoard.length)   gasBoard=[...(ws.matchingBoard||[])];
