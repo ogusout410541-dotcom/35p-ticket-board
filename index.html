@@ -1283,9 +1283,9 @@ function saveSettings(){
   if(cleaned.length===0){ toast('ライブを1つ以上追加してください','error'); return; }
   ws.lives=cleaned; gasLives=cleaned; saveState(); closeSettings(); renderAll();
   toast('設定を保存しました');
-  postToGas({action:'syncLives',lives:cleaned}).then(r=>{
-    if(r&&r.success&&!r.local) toast('ライブ設定をクラウドに同期しました','info');
-    else if(r===null) toast('ライブ設定のクラウド同期に失敗しました','error');
+  syncLivesToGas(cleaned).then(result=>{
+    if(result===true) toast('ライブ設定をクラウドに同期しました','info');
+    else if(result===false||result===null) toast('ライブ設定のクラウド同期に失敗しました','error');
   });
 }
 function renderSettingsModal(){
@@ -1776,29 +1776,31 @@ function renderMemberList(){
   const lives=getAllLives();
   const allFiltered=getFiltered();
   const editId=document.getElementById('f-edit-id').value;
-
-  // endDate過ぎたライブのメンバーは参戦履歴タブへ自動移行 → 当落管理から完全非表示
   const activeMembers=allFiltered.filter(m=>{ const lv=lives.find(l=>l.name===m.live); return !lv||!isLiveExpired(lv); });
 
   document.getElementById('filtered-count').textContent=activeMembers.length>0?`${activeMembers.length}件`:'';
 
   const tbody=document.getElementById('members-tbody');
   const tableEmpty=document.getElementById('table-empty');
-  if(activeMembers.length===0){
-    tbody.innerHTML=''; tableEmpty.classList.remove('hidden');
-  } else {
-    tableEmpty.classList.add('hidden');
-    tbody.innerHTML=activeMembers.map((m,i)=>_memberRowHtml(m,i,ws,editId,true)).join('');
-    document.getElementById('select-all').checked=activeMembers.length>0&&activeMembers.every(m=>selectedIds.has(m.id));
-  }
-
   const cardsContainer=document.getElementById('cards-container');
   const cardsEmpty=document.getElementById('cards-empty');
+  const isDesktop=window.matchMedia('(min-width:640px)').matches;
+
   if(activeMembers.length===0){
+    tbody.innerHTML=''; tableEmpty.classList.remove('hidden');
     cardsContainer.innerHTML=''; cardsEmpty.classList.remove('hidden');
   } else {
+    tableEmpty.classList.add('hidden');
     cardsEmpty.classList.add('hidden');
-    cardsContainer.innerHTML=activeMembers.map(m=>_memberCardHtml(m,ws)).join('');
+    if(isDesktop){
+      tbody.innerHTML=activeMembers.map((m,i)=>_memberRowHtml(m,i,ws,editId,true)).join('');
+      document.getElementById('select-all').checked=activeMembers.every(m=>selectedIds.has(m.id));
+      cardsContainer.innerHTML='';
+    } else {
+      cardsContainer.innerHTML=activeMembers.map(m=>_memberCardHtml(m,ws)).join('');
+      tbody.innerHTML='';
+      const sa=document.getElementById('select-all'); if(sa) sa.checked=false;
+    }
   }
 }
 
@@ -2956,8 +2958,8 @@ async function migrateLocalToGas(){
   let ok=0, fail=0;
   // ── Lives ──
   if(localLives.length>0){
-    const r=await postToGas({action:'syncLives',lives:localLives});
-    if(r&&r.success&&!r.local){
+    const migResult=await syncLivesToGas(localLives);
+    if(migResult===true){
       gasLives=[...localLives]; ok+=localLives.length;
       localStorage.setItem(GM_LIVES,'1');
     } else fail+=localLives.length;
@@ -3027,8 +3029,8 @@ async function fetchFromGas(){
     } else if(!localStorage.getItem(GM_LIVES)){
       const localLives=ws.lives||[];
       if(localLives.length>0){
-        const r=await postToGas({action:'syncLives',lives:localLives});
-        if(r&&r.success&&!r.local){ gasLives=[...localLives]; localStorage.setItem(GM_LIVES,'1'); toast('ライブデータをGASに移行しました','info'); }
+        const migResult=await syncLivesToGas(localLives);
+        if(migResult===true){ gasLives=[...localLives]; localStorage.setItem(GM_LIVES,'1'); toast('ライブデータをGASに移行しました','info'); }
         else gasLives=[...localLives];
       } else { localStorage.setItem(GM_LIVES,'1'); gasLives=[]; }
     } else {
@@ -3092,14 +3094,30 @@ async function fetchFromGas(){
   }
 }
 
+// GAS POSTがリダイレクト時にGETへ変化する問題を回避するため、
+// clearLives(全削除) + addLive×N(1件ずつGETで追加) に分割する
+async function syncLivesToGas(lives){
+  const clearR=await postToGas({action:'clearLives'});
+  if(!clearR) return null;
+  if(clearR.local) return 'local';
+  if(!clearR.success) return false;
+  for(const live of lives){
+    const r=await postToGas({action:'addLive',live});
+    if(!r||!r.success) return false;
+  }
+  return true;
+}
+
 async function postToGas(payload){
   if(!GAS_URL||GAS_URL==='YOUR_GAS_WEB_APP_URL') return {success:true,local:true};
   try {
-    const url=GAS_URL+'?payload='+encodeURIComponent(JSON.stringify(payload))+'&t='+Date.now();
-    const res=await fetch(url);
+    const body=JSON.stringify(payload);
+    // URL長制限(約2KB)を超えるペイロードはPOSTで送信（syncLives等）
+    const res = body.length > 800
+      ? await fetch(GAS_URL, {method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'}, body})
+      : await fetch(GAS_URL+'?payload='+encodeURIComponent(body)+'&t='+Date.now());
     if(!res.ok) throw new Error('HTTP '+res.status);
     const json=await res.json();
-    // GASが{success:true}以外を返した場合はコンソールに記録
     if(!json.success&&!json.local) console.warn('[GAS write failed]',payload.action,json);
     return json;
   } catch(err){
@@ -3196,6 +3214,13 @@ function bindEvents(){
   // BFCache（iOS/Chrome 戻る/進む）復帰時にデータを再フェッチ
   window.addEventListener('pageshow',e=>{
     if(e.persisted) fetchFromGas();
+  });
+
+  // 画面幅のブレークポイント(640px)を跨いだときだけ再描画
+  let _lastIsDesktop=window.matchMedia('(min-width:640px)').matches;
+  window.addEventListener('resize',()=>{
+    const d=window.matchMedia('(min-width:640px)').matches;
+    if(d!==_lastIsDesktop){ _lastIsDesktop=d; renderMemberList(); }
   });
 }
 
