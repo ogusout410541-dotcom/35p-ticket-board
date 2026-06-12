@@ -194,6 +194,47 @@ main { padding-bottom: max(10rem, calc(8rem + env(safe-area-inset-bottom, 0px)))
   </div>
 </div>
 
+<!-- ===== ADMIN AUTH MODAL ===== -->
+<div id="admin-auth-modal" class="hidden fixed inset-0 z-[85] flex items-center justify-center bg-black/80 backdrop-blur-sm">
+  <div class="modal-inner bg-slate-900 border border-red-900/60 rounded-2xl w-full max-w-sm mx-4 shadow-2xl overflow-hidden">
+    <!-- 赤帯ヘッダー -->
+    <div class="bg-red-950/80 border-b border-red-900/60 px-5 py-4 flex items-center gap-3">
+      <div class="w-9 h-9 rounded-full bg-red-900/60 border border-red-700/60 flex items-center justify-center flex-shrink-0">
+        <i class="fa-solid fa-shield-halved text-red-400 text-base"></i>
+      </div>
+      <div class="min-w-0">
+        <p class="font-bold text-red-300 text-sm leading-tight">管理者専用エリア</p>
+        <p class="text-xs text-red-400/80 leading-tight mt-0.5">設定の変更は全ユーザーに影響します</p>
+      </div>
+    </div>
+    <!-- 警告文 + 入力 -->
+    <div class="px-5 py-4">
+      <div class="bg-red-950/40 border border-red-900/50 rounded-xl px-4 py-3 mb-4">
+        <p class="text-xs text-red-300 leading-relaxed">
+          <i class="fa-solid fa-triangle-exclamation text-red-400 mr-1"></i>
+          <strong>【警告】</strong>ここは管理者専用の設定エリアです。ライブ・公演情報を変更すると、このツールを利用している<strong>全ユーザーのデータに影響</strong>を及ぼします。管理者以外は操作しないでください。
+        </p>
+      </div>
+      <label class="block text-xs text-slate-400 mb-1.5">
+        合言葉（管理者のみ）
+      </label>
+      <input id="admin-passcode-input" type="password" placeholder="合言葉を入力..."
+        autocomplete="off"
+        class="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 mb-4">
+      <div class="flex gap-2">
+        <button onclick="closeAdminAuthModal()"
+          class="flex-1 py-2.5 bg-slate-700 hover:bg-slate-600 text-slate-200 font-semibold rounded-xl text-sm transition">
+          キャンセル
+        </button>
+        <button onclick="submitAdminAuth()"
+          class="flex-1 py-2.5 bg-red-700 hover:bg-red-600 text-white font-bold rounded-xl text-sm transition flex items-center justify-center gap-2">
+          <i class="fa-solid fa-unlock text-xs"></i> 認証して開く
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- ===== SETTINGS MODAL ===== -->
 <div id="settings-modal" class="hidden fixed inset-0 z-[80] flex items-center justify-center bg-black/75 backdrop-blur-sm">
   <div id="settings-modal-inner" class="modal-inner bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-xl mx-4 max-h-[90vh] flex flex-col shadow-2xl">
@@ -206,6 +247,7 @@ main { padding-bottom: max(10rem, calc(8rem + env(safe-area-inset-bottom, 0px)))
       </button>
     </div>
     <div class="overflow-y-auto flex-1 p-4">
+      <div id="settings-cat-wrap" class="mb-4"></div>
       <div id="settings-lives-sortable" class="flex flex-col gap-3"></div>
       <button onclick="addLive()"
         class="mt-3 w-full border border-dashed border-slate-700 hover:border-indigo-500 text-slate-500 hover:text-indigo-400 text-sm py-2.5 rounded-xl transition flex items-center justify-center gap-2">
@@ -462,7 +504,7 @@ main { padding-bottom: max(10rem, calc(8rem + env(safe-area-inset-bottom, 0px)))
       </div>
       <div>
         <label class="block text-xs text-slate-400 mb-1.5">ライブ</label>
-        <select id="f-live" onchange="updatePerfSelect()"
+        <select id="f-live"
           class="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-sm text-slate-200 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"></select>
       </div>
       <div>
@@ -1112,9 +1154,16 @@ const MATCH_FC        = {fc:'FC枠',general:'一般枠'};
 const MATCH_PRIORITY  = {first:'1次先行',second:'2次先行',third:'3次先行',general:'一般販売',resale:'リセール',other:'その他'};
 const MATCH_PRICE     = {fee:'定価+手数料',face:'定価のみ',consult:'要相談',any:'こだわらない'};
 const LIVE_PALETTE    = ['#6366f1','#ec4899','#f97316','#10b981','#3b82f6','#8b5cf6','#f59e0b','#06b6d4','#ef4444','#84cc16'];
+const DEFAULT_CATEGORIES = [
+  { id: 'cat_holo_solo', parentName: 'Hololive',    childName: 'ソロライブ' },
+  { id: 'cat_holo_gen',  parentName: 'Hololive',    childName: '期生グループ' },
+  { id: 'cat_holo_fes',  parentName: 'Hololive',    childName: 'Fes & Expo' },
+  { id: 'cat_other',     parentName: '個人・他企業', childName: '' },
+];
 
 let state          = null;
 let settingsDraft  = null;
+let settingsCategoryDraft = null;
 let _settingsSnapshot = null;
 let pendingImport  = null;
 let discardTarget  = null;
@@ -1133,6 +1182,34 @@ let archiveFilterHasComment= false;
 let archiveGroupOpen       = {};
 
 // ============================================================
+// ADMIN AUTH  ※公開前にパスコードを変更してください
+// ============================================================
+const ADMIN_PASSCODE = 'mikoelite'; // ← ここを任意の合言葉に変更
+
+function showAdminAuthModal(){
+  const inp=document.getElementById('admin-passcode-input');
+  if(inp) inp.value='';
+  document.getElementById('admin-auth-modal').classList.remove('hidden');
+  setTimeout(()=>inp?.focus(), 120);
+}
+function closeAdminAuthModal(){
+  document.getElementById('admin-auth-modal').classList.add('hidden');
+}
+function submitAdminAuth(){
+  const inp=document.getElementById('admin-passcode-input');
+  if(!inp) return;
+  if(inp.value === ADMIN_PASSCODE){
+    closeAdminAuthModal();
+    openSettings();
+  } else {
+    inp.value='';
+    _shake(inp);
+    toast('合言葉が違います','error');
+    setTimeout(()=>inp.focus(), 80);
+  }
+}
+
+// ============================================================
 // GAS CONFIG  ※デプロイ後にURLを書き換えてください
 // ============================================================
 const GAS_URL  = 'https://script.google.com/macros/s/AKfycbzks9aIIcS4KDTOiGUMhR7nFYc_shEZhOzqCXoS7HzLjvx1kSAgSeUa5vR1Y4zi1YZsBw/exec';
@@ -1140,6 +1217,7 @@ let gasLives    = [];
 let gasBoard    = [];
 let gasMembers  = [];
 let gasArchives = [];
+let _pendingLivesSync = false; // saveSettings後のGAS同期が未完了の間 true
 function isGasEnabled(){ return !!GAS_URL && GAS_URL !== 'YOUR_GAS_WEB_APP_URL'; }
 const GM_ARCHIVES = 'gas-migrated-archives-v1';
 
@@ -1161,7 +1239,7 @@ function getActiveLives(){ return getAllLives().filter(l=>!isLiveExpired(l)); }
 // UTILS
 // ============================================================
 function genId(p='id'){ return p+'_'+Math.random().toString(36).slice(2,10); }
-function esc(s){ return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function esc(s){ return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
 function pad(n){ return String(n).padStart(2,'0'); }
 function fmtDate(d){
   if(!d) return '';
@@ -1199,6 +1277,75 @@ function _shake(el){
 }
 
 // ============================================================
+// LIVE CATEGORY HELPERS
+// ============================================================
+function getCategories(){
+  const ws = currentWs();
+  return (ws.liveCategories && ws.liveCategories.length > 0)
+    ? ws.liveCategories
+    : DEFAULT_CATEGORIES;
+}
+
+// ライブ選択プルダウン用 <optgroup> HTML を生成（カテゴリー階層表現）
+function buildLiveOptgroups(lives, selectedValue, defaultOpt){
+  const cats = getCategories();
+  const groups = new Map();
+  const uncategorized = [];
+  for(const l of lives){
+    const cat = l.categoryId ? cats.find(c => c.id === l.categoryId) : null;
+    if(cat){
+      const label = cat.childName ? `${cat.parentName} ＞ ${cat.childName}` : cat.parentName;
+      if(!groups.has(label)) groups.set(label, []);
+      groups.get(label).push(l);
+    } else {
+      uncategorized.push(l);
+    }
+  }
+  let html = defaultOpt || '';
+  for(const [label, groupLives] of groups){
+    html += `<optgroup label="${esc(label)}">`;
+    html += groupLives.map(l => `<option value="${esc(l.name)}"${l.name===selectedValue?' selected':''}>${esc(l.name)}</option>`).join('');
+    html += '</optgroup>';
+  }
+  if(uncategorized.length > 0){
+    html += '<optgroup label="未分類">';
+    html += uncategorized.map(l => `<option value="${esc(l.name)}"${l.name===selectedValue?' selected':''}>${esc(l.name)}</option>`).join('');
+    html += '</optgroup>';
+  }
+  return html;
+}
+
+// 参戦履歴セレクト用（終了マーク付き）
+function buildArchiveLiveOptgroups(lives, selectedValue){
+  const cats = getCategories();
+  const groups = new Map();
+  const uncategorized = [];
+  for(const l of lives){
+    const cat = l.categoryId ? cats.find(c => c.id === l.categoryId) : null;
+    const displayName = esc(l.name) + (isLiveExpired(l) ? ' (終了)' : '');
+    if(cat){
+      const label = cat.childName ? `${cat.parentName} ＞ ${cat.childName}` : cat.parentName;
+      if(!groups.has(label)) groups.set(label, []);
+      groups.get(label).push({ l, displayName });
+    } else {
+      uncategorized.push({ l, displayName });
+    }
+  }
+  let html = '';
+  for(const [label, items] of groups){
+    html += `<optgroup label="${esc(label)}">`;
+    html += items.map(({ l, displayName }) => `<option value="${esc(l.name)}"${l.name===selectedValue?' selected':''}>${displayName}</option>`).join('');
+    html += '</optgroup>';
+  }
+  if(uncategorized.length > 0){
+    html += '<optgroup label="未分類">';
+    html += uncategorized.map(({ l, displayName }) => `<option value="${esc(l.name)}"${l.name===selectedValue?' selected':''}>${displayName}</option>`).join('');
+    html += '</optgroup>';
+  }
+  return html;
+}
+
+// ============================================================
 // STORAGE
 // ============================================================
 function defaultState(){
@@ -1212,7 +1359,8 @@ function defaultState(){
           {id:genId('p'),name:'Day2',dateStart:'',dateEnd:''}
         ]
       }],
-      members:[], matchingBoard:[]
+      members:[], matchingBoard:[],
+      liveCategories: JSON.parse(JSON.stringify(DEFAULT_CATEGORIES))
     }],
     currentWsId:wsId
   };
@@ -1296,7 +1444,7 @@ function createWorkspace(){
   const name=inp.value.trim();
   if(!name){ _shake(inp); return; }
   const id=genId('ws');
-  state.workspaces.push({id,name,lives:[],members:[],matchingBoard:[]});
+  state.workspaces.push({id,name,lives:[],members:[],matchingBoard:[],liveCategories:JSON.parse(JSON.stringify(DEFAULT_CATEGORIES))});
   state.currentWsId=id; saveState(); inp.value='';
   renderWsModal(); renderAll();
   toast('プロジェクトを作成しました');
@@ -1331,26 +1479,34 @@ function switchWorkspace(id){
 // ============================================================
 function openSettings(){
   settingsDraft=JSON.parse(JSON.stringify(getAllLives()));
-  _settingsSnapshot=JSON.stringify(settingsDraft);
+  settingsCategoryDraft=JSON.parse(JSON.stringify(getCategories()));
+  _settingsSnapshot=JSON.stringify({lives:settingsDraft,categories:settingsCategoryDraft});
   renderSettingsModal();
   document.getElementById('settings-modal').classList.remove('hidden');
 }
-function closeSettings(){ document.getElementById('settings-modal').classList.add('hidden'); settingsDraft=null; _settingsSnapshot=null; }
+function closeSettings(){ document.getElementById('settings-modal').classList.add('hidden'); settingsDraft=null; settingsCategoryDraft=null; _settingsSnapshot=null; _catSectionOpen=false; }
 function confirmCloseSettings(){ if(isSettingsDirty()){ discardTarget='settings'; openDiscardModal(); } else { closeSettings(); } }
-function isSettingsDirty(){ if(!settingsDraft||!_settingsSnapshot) return false; syncSettingsFromDOM(); return JSON.stringify(settingsDraft)!==_settingsSnapshot; }
+function isSettingsDirty(){ if(!settingsDraft||!_settingsSnapshot) return false; syncSettingsFromDOM(); return JSON.stringify({lives:settingsDraft,categories:settingsCategoryDraft})!==_settingsSnapshot; }
 function saveSettings(){
   syncSettingsFromDOM();
   const ws=currentWs();
   const cleaned=settingsDraft.map(l=>({...l,name:l.name.trim(),performances:l.performances.map(p=>({...p,name:p.name.trim()}))})).filter(l=>l.name);
   if(cleaned.length===0){ toast('ライブを1つ以上追加してください','error'); return; }
-  ws.lives=cleaned; gasLives=cleaned; saveState(); closeSettings(); renderAll();
+  const cleanedCats=(settingsCategoryDraft||[]).filter(c=>c.parentName.trim());
+  ws.lives=cleaned; ws.liveCategories=cleanedCats; gasLives=cleaned; saveState(); closeSettings(); renderAll();
   toast('設定を保存しました');
+  _pendingLivesSync = true;
   syncLivesToGas(cleaned).then(result=>{
-    if(result===true) toast('ライブ設定をクラウドに同期しました','info');
-    else if(result===false||result===null) toast('ライブ設定のクラウド同期に失敗しました','error');
+    if(result===true){
+      _pendingLivesSync = false;
+      toast('ライブ設定をクラウドに同期しました','info');
+    } else if(result===false||result===null){
+      toast('ライブ設定のクラウド同期に失敗しました。再度「保存」して同期してください','error');
+    }
   });
 }
 function renderSettingsModal(){
+  renderCategorySection();
   const container=document.getElementById('settings-lives-sortable');
   container.innerHTML=(settingsDraft||[]).map(live=>`
     <div class="live-block bg-slate-800 border border-slate-700 rounded-xl p-3" data-live-id="${esc(live.id)}">
@@ -1384,6 +1540,14 @@ function renderSettingsModal(){
         </label>
         <span class="text-xs text-slate-600 italic">ONで即終了扱い（日付に関わらず）</span>
       </div>
+      <div class="flex items-center gap-2 mb-2 ml-8">
+        <i class="fa-solid fa-tags text-slate-500 text-xs flex-shrink-0"></i>
+        <span class="text-xs text-slate-500 flex-shrink-0">カテゴリー</span>
+        <select class="live-category-select bg-slate-700 border border-slate-600 rounded-lg px-2 py-1 text-xs text-slate-300 focus:outline-none focus:border-indigo-500 flex-1" title="プルダウンでの分類グループ">
+          <option value="">-- 未分類 --</option>
+          ${(settingsCategoryDraft||[]).filter(c=>c.parentName.trim()).map(c=>`<option value="${esc(c.id)}"${live.categoryId===c.id?' selected':''}>${esc(c.parentName)}${c.childName?' ＞ '+esc(c.childName):''}</option>`).join('')}
+        </select>
+      </div>
       <div class="perf-list flex flex-col gap-1.5 ml-6 mb-2" data-live-id="${esc(live.id)}">
         ${live.performances.map(p=>`
           <div class="perf-item flex items-center gap-2 bg-slate-700/50 border border-slate-600/60 rounded-lg px-2 py-1.5 flex-wrap" data-perf-id="${esc(p.id)}">
@@ -1414,6 +1578,7 @@ function syncSettingsFromDOM(){
     const gi=block.querySelector('.live-guide-select'); if(gi) live.guide=gi.value;
     const edi=block.querySelector('.live-enddate-input'); if(edi) live.endDate=edi.value;
     const mei=block.querySelector('.live-manualended-input'); if(mei) live.manualEnded=mei.checked;
+    const cati=block.querySelector('.live-category-select'); if(cati) live.categoryId=cati.value||undefined;
     const perfOrder=[];
     block.querySelectorAll('.perf-item').forEach(pi=>{
       const perfId=pi.dataset.perfId;
@@ -1427,7 +1592,100 @@ function syncSettingsFromDOM(){
     live.performances=perfOrder; liveOrder.push(live);
   });
   settingsDraft=liveOrder;
+  // カテゴリードラフトを DOM から同期
+  if(settingsCategoryDraft){
+    const catList=[];
+    document.querySelectorAll('[data-cat-id]').forEach(row=>{
+      const catId=row.dataset.catId;
+      const cat=settingsCategoryDraft.find(c=>c.id===catId); if(!cat) return;
+      const pi=row.querySelector('.cat-parent-input');
+      const chi=row.querySelector('.cat-child-input');
+      if(pi) cat.parentName=pi.value;
+      if(chi) cat.childName=chi.value;
+      catList.push(cat);
+    });
+    if(catList.length>0||document.querySelectorAll('[data-cat-id]').length>0) settingsCategoryDraft=catList;
+  }
 }
+// ── カテゴリー設定セクション ──
+let _catSectionOpen = false;
+function renderCategorySection(){
+  const wrap=document.getElementById('settings-cat-wrap'); if(!wrap) return;
+  const cats=settingsCategoryDraft||[];
+  const chevron=_catSectionOpen?'fa-chevron-up':'fa-chevron-down';
+  wrap.innerHTML=`
+    <div>
+      <button type="button" onclick="toggleCategorySection()"
+        class="w-full flex items-center gap-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-xl px-4 py-2.5 transition text-left">
+        <i class="fa-solid fa-tags text-indigo-400 text-sm flex-shrink-0"></i>
+        <span class="text-sm font-semibold text-slate-200 flex-1">カテゴリー設定</span>
+        <span class="text-xs text-slate-500 mr-1">${cats.length}件</span>
+        <i id="cat-chevron" class="fa-solid ${chevron} text-slate-500 text-xs"></i>
+      </button>
+      <div id="cat-section-body" class="${_catSectionOpen?'':'hidden'} mt-2 bg-slate-800/50 border border-slate-700/60 rounded-xl p-3">
+        <p class="text-xs text-slate-500 mb-3">ライブを「親 ＞ 子」の2階層で分類します。プルダウンで <code class="bg-slate-700 px-1 rounded text-slate-400">Hololive ＞ ソロライブ</code> のように表示されます。</p>
+        <div class="flex flex-col gap-2 mb-3">
+          ${cats.map(c=>`
+            <div class="flex items-center gap-2 bg-slate-700/40 border border-slate-600/50 rounded-lg px-2 py-1.5" data-cat-id="${esc(c.id)}">
+              <input type="text" class="cat-parent-input flex-1 min-w-0 bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-indigo-500" placeholder="親グループ名" value="${esc(c.parentName)}">
+              <span class="text-slate-500 text-xs flex-shrink-0">＞</span>
+              <input type="text" class="cat-child-input flex-1 min-w-0 bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-indigo-500" placeholder="子グループ名（任意）" value="${esc(c.childName)}">
+              <button type="button" onclick="removeCategory('${esc(c.id)}')" class="text-slate-500 hover:text-red-400 transition p-1 rounded flex-shrink-0" title="削除">
+                <i class="fa-solid fa-times text-xs"></i>
+              </button>
+            </div>
+          `).join('')}
+          ${cats.length===0?'<p class="text-xs text-slate-600 text-center py-2">カテゴリーがありません</p>':''}
+        </div>
+        <button type="button" onclick="addCategory()"
+          class="w-full border border-dashed border-slate-600 hover:border-indigo-500 text-slate-500 hover:text-indigo-400 text-xs py-2 rounded-lg transition flex items-center justify-center gap-1.5">
+          <i class="fa-solid fa-plus"></i> カテゴリーを追加
+        </button>
+      </div>
+    </div>`;
+}
+function toggleCategorySection(){
+  syncSettingsFromDOM();
+  _catSectionOpen=!_catSectionOpen;
+  renderCategorySection();
+}
+function addCategory(){
+  syncSettingsFromDOM();
+  if(!settingsCategoryDraft) settingsCategoryDraft=[];
+  settingsCategoryDraft.push({id:genId('cat'),parentName:'',childName:''});
+  _catSectionOpen=true;
+  renderCategorySection();
+  // 追加した行の親グループ入力にフォーカス
+  const rows=document.querySelectorAll('[data-cat-id]');
+  rows[rows.length-1]?.querySelector('.cat-parent-input')?.focus();
+  // ライブブロックのカテゴリーセレクターも再描画
+  renderSettingsLiveCategorySelects();
+}
+function removeCategory(catId){
+  syncSettingsFromDOM();
+  if(!settingsCategoryDraft) return;
+  settingsCategoryDraft=settingsCategoryDraft.filter(c=>c.id!==catId);
+  // そのカテゴリーを使っていたライブは未分類に
+  if(settingsDraft) settingsDraft.forEach(l=>{ if(l.categoryId===catId) l.categoryId=undefined; });
+  renderCategorySection();
+  renderSettingsLiveCategorySelects();
+}
+function renderSettingsLiveCategorySelects(){
+  // カテゴリーセレクターだけ再描画（ライブブロック全体の再構築を避け、フォーカス保護）
+  document.querySelectorAll('.live-block').forEach(block=>{
+    const liveId=block.dataset.liveId;
+    const live=settingsDraft&&settingsDraft.find(l=>l.id===liveId); if(!live) return;
+    const sel=block.querySelector('.live-category-select'); if(!sel) return;
+    if(document.activeElement===sel) return; // iOS フォーカス保護
+    const curVal=sel.value;
+    sel.innerHTML='<option value="">-- 未分類 --</option>'+
+      (settingsCategoryDraft||[]).filter(c=>c.parentName.trim()).map(c=>
+        `<option value="${esc(c.id)}"${c.id===curVal?' selected':''}>${esc(c.parentName)}${c.childName?' ＞ '+esc(c.childName):''}</option>`
+      ).join('');
+    sel.value=curVal;
+  });
+}
+
 function addLive(){
   syncSettingsFromDOM();
   settingsDraft.push({id:genId('live'),name:'新しいライブ',color:LIVE_PALETTE[settingsDraft.length%LIVE_PALETTE.length],guide:'lawson',endDate:'',manualEnded:false,performances:[]});
@@ -1519,12 +1777,11 @@ function getOption(type){
 // MEMBER FORM
 // ============================================================
 function populateFormSelects(){
-  const lives=getActiveLives();
+  const lives=getAllLives();
   const liveEl=document.getElementById('f-live');
   if (document.activeElement === liveEl) return;
   const selLive=liveEl.value;
-  liveEl.innerHTML='<option value="">-- 選択 --</option>'+
-    lives.map(l=>`<option value="${esc(l.name)}"${l.name===selLive?' selected':''}>${esc(l.name)}</option>`).join('');
+  liveEl.innerHTML=buildLiveOptgroups(lives, selLive, '<option value="">-- 選択 --</option>');
   liveEl.value = selLive;
   updatePerfSelect();
   buildSeatBtns();
@@ -1532,7 +1789,7 @@ function populateFormSelects(){
 function updatePerfSelect(){
   const perfEl=document.getElementById('f-perf');
   if (document.activeElement === perfEl) return;
-  const lives=getActiveLives();
+  const lives=getAllLives();
   const liveName=document.getElementById('f-live').value;
   const selPerf=perfEl.value;
   const live=lives.find(l=>l.name===liveName);
@@ -1733,15 +1990,19 @@ function renderFilterOptions(){
   const lives=gasLives.length>0?gasLives:ws.lives;
   const flLive=document.getElementById('filter-live');
   const flPerf=document.getElementById('filter-perf');
-  if (document.activeElement === flLive || document.activeElement === flPerf) return;
   const selLive=flLive.value, selPerf=flPerf.value;
-  flLive.innerHTML='<option value="">全ライブ</option>'+
-    lives.map(l=>`<option value="${esc(l.name)}"${l.name===selLive?' selected':''}>${esc(l.name)}</option>`).join('');
-  flLive.value = selLive;
-  const lv=lives.find(l=>l.name===selLive);
-  flPerf.innerHTML='<option value="">全公演</option>'+
-    (lv?.performances||[]).map(p=>`<option value="${esc(p.name)}"${p.name===selPerf?' selected':''}>${esc(p.name)}</option>`).join('');
-  flPerf.value = selPerf;
+  // 各ドロップダウンが操作中のときだけ、そのドロップダウンの再描画を個別にスキップする
+  // （片方がアクティブでも、もう片方は必ず更新する）
+  if (document.activeElement !== flLive) {
+    flLive.innerHTML=buildLiveOptgroups(lives, selLive, '<option value="">全ライブ</option>');
+    flLive.value = selLive;
+  }
+  if (document.activeElement !== flPerf) {
+    const lv=lives.find(l=>l.name===selLive);
+    flPerf.innerHTML='<option value="">全公演</option>'+
+      (lv?.performances||[]).map(p=>`<option value="${esc(p.name)}"${p.name===selPerf?' selected':''}>${esc(p.name)}</option>`).join('');
+    flPerf.value = selPerf;
+  }
 }
 function getFiltered(){
   const ws=currentWs();
@@ -2055,7 +2316,18 @@ function handleImportFile(e){
 }
 function confirmImport(){
   if(!pendingImport) return;
+  if(
+    !pendingImport.workspaces ||
+    !Array.isArray(pendingImport.workspaces) ||
+    pendingImport.workspaces.length === 0
+  ){
+    toast('無効なデータ形式です（workspacesが見つかりません）','error');
+    pendingImport=null; closeImportModal(); return;
+  }
   state=pendingImport; pendingImport=null;
+  if(!state.workspaces.find(w=>w.id===state.currentWsId)){
+    state.currentWsId=state.workspaces[0].id;
+  }
   saveState(); closeImportModal(); clearSelection(); _doCancelEdit();
   const ws=currentWs();
   gasLives=[...(ws.lives||[])];
@@ -2121,8 +2393,7 @@ function populateMatchingFormSelects(){
   const ml=document.getElementById('m-live'); if(!ml) return;
   if (document.activeElement === ml) return;
   const selLive=ml.value;
-  ml.innerHTML='<option value="">-- ライブ --</option>'+
-    activeLives.map(l=>`<option value="${esc(l.name)}"${l.name===selLive?' selected':''}>${esc(l.name)}</option>`).join('');
+  ml.innerHTML=buildLiveOptgroups(activeLives, selLive, '<option value="">-- ライブ --</option>');
   ml.value = selLive;
   updateMatchPerfSelect();
   buildMatchSeatBtns(document.getElementById('m-seat')?.value||'一般');
@@ -2130,8 +2401,7 @@ function populateMatchingFormSelects(){
   if(mfLive){
     if (document.activeElement === mfLive) return;
     const sel=mfLive.value;
-    mfLive.innerHTML='<option value="">全ライブ</option>'+
-      activeLives.map(l=>`<option value="${esc(l.name)}"${l.name===sel?' selected':''}>${esc(l.name)}</option>`).join('');
+    mfLive.innerHTML=buildLiveOptgroups(activeLives, sel, '<option value="">全ライブ</option>');
     mfLive.value = sel;
   }
   updateMfPerfOptions();
@@ -2551,7 +2821,7 @@ function renderMatchingBoard(){
           ${settlement?`<span class="${e.settlement==='any'?'flex-badge':'info-tag info-tag-trade'}"><i class="fa-solid fa-wallet" style="font-size:.55rem;opacity:.8"></i> 精算: ${esc(settlement)}</span>`:''}
         </div>`:''}
         ${contactHtml}
-        ${e.note?`<p class="text-xs text-slate-400 bg-slate-800/50 rounded-lg px-2.5 py-1.5 mb-2 leading-relaxed">${esc(e.note)}</p>`:''}
+        ${e.note?`<p class="text-xs text-slate-400 bg-slate-800/50 rounded-lg px-2.5 py-1.5 mb-2 leading-relaxed break-all">${esc(e.note)}</p>`:''}
         <div class="flex items-center justify-between pt-2 border-t border-slate-800/50">
           <span class="text-xs text-slate-600">${e.addedAt?new Date(e.addedAt).toLocaleDateString('ja'):''}</span>
           <div class="flex items-center gap-1">
@@ -2600,8 +2870,16 @@ function copyMatchingSummary(){
     lines.push('');
   });
   const txt=lines.join('\n').trimEnd();
-  if(!navigator.clipboard){ toast('クリップボードへのアクセスが許可されていません','error'); return; }
-  navigator.clipboard.writeText(txt).then(()=>toast('マッチングサマリーをコピーしました')).catch(()=>toast('コピーに失敗しました','error'));
+  const fallback=()=>{
+    const el=document.createElement('textarea');
+    el.value=txt; el.style.cssText='position:fixed;opacity:0;top:0;left:0';
+    document.body.appendChild(el); el.focus(); el.select();
+    try{ document.execCommand('copy'); toast('マッチングサマリーをコピーしました'); }
+    catch(_){ toast('コピーに失敗しました（手動でコピーしてください）','error'); }
+    document.body.removeChild(el);
+  };
+  if(!navigator.clipboard){ fallback(); return; }
+  navigator.clipboard.writeText(txt).then(()=>toast('マッチングサマリーをコピーしました')).catch(fallback);
 }
 
 // ============================================================
@@ -2627,7 +2905,7 @@ function _arcCardHtml(item){
           ${m.performance?`<span class="perf-badge px-1.5 py-0.5 rounded text-xs">${esc(m.performance)}</span>`:''}
           <span class="sb-${seatCls} px-2 py-0.5 rounded text-xs font-bold">${esc(m.seatType||'一般')}</span>
         </div>
-        ${m.comment?`<p class="text-xs text-slate-400 bg-slate-800/50 rounded-lg px-2.5 py-1.5 mb-2 leading-relaxed">${esc(m.comment)}</p>`:''}
+        ${m.comment?`<p class="text-xs text-slate-400 bg-slate-800/50 rounded-lg px-2.5 py-1.5 mb-2 leading-relaxed break-all">${esc(m.comment)}</p>`:''}
         <div class="flex items-center justify-between pt-2 border-t border-slate-800/50">
           <div class="flex items-center gap-1">
             ${dateStr?`<span class="text-xs text-slate-600">${dateStr}</span>`:''}
@@ -2661,7 +2939,7 @@ function _arcCardHtml(item){
           ${arc.performance?`<span class="perf-badge px-1.5 py-0.5 rounded text-xs">${esc(arc.performance)}</span>`:''}
           <span class="sb-${seatCls} px-2 py-0.5 rounded text-xs font-bold">${esc(arc.seatType||'一般')}</span>
         </div>
-        ${arc.comment?`<p class="text-xs text-slate-400 bg-slate-800/50 rounded-lg px-2.5 py-1.5 mb-2 leading-relaxed">${esc(arc.comment)}</p>`:''}
+        ${arc.comment?`<p class="text-xs text-slate-400 bg-slate-800/50 rounded-lg px-2.5 py-1.5 mb-2 leading-relaxed break-all">${esc(arc.comment)}</p>`:''}
         <div class="flex items-center justify-between pt-2 border-t border-slate-800/50">
           <div class="flex items-center gap-1">
             ${dateStr?`<span class="text-xs text-slate-600">${dateStr}</span>`:''}
@@ -2889,8 +3167,6 @@ async function incrementLike(archiveId){
 }
 function populateArchiveFormSelects(){
   const lives=getAllLives();
-  const expired=lives.filter(l=>isLiveExpired(l));
-  const active=lives.filter(l=>!isLiveExpired(l));
   const sel=document.getElementById('arc-live-select');
   if(!sel) return;
   if (document.activeElement === sel) return;
@@ -2898,16 +3174,7 @@ function populateArchiveFormSelects(){
   const perfSel=document.getElementById('arc-perf-select');
   const curPerf=perfSel?perfSel.value:'';
   let html='<option value="">-- 選択 --</option>';
-  if(expired.length>0){
-    html+='<optgroup label="終了ライブ">';
-    html+=expired.map(l=>`<option value="${esc(l.name)}"${l.name===cur?' selected':''}>${esc(l.name)}</option>`).join('');
-    html+='</optgroup>';
-  }
-  if(active.length>0){
-    html+='<optgroup label="開催中・予定">';
-    html+=active.map(l=>`<option value="${esc(l.name)}"${l.name===cur?' selected':''}>${esc(l.name)}</option>`).join('');
-    html+='</optgroup>';
-  }
+  html+=buildArchiveLiveOptgroups(lives, cur);
   html+=`<option value="__other__"${cur==='__other__'?' selected':''}>その他（手入力）</option>`;
   sel.innerHTML=html;
   sel.value = cur;
@@ -3038,23 +3305,12 @@ function closeArchiveEditModal(){
 }
 function populateArchiveEditLiveSelect(curLive){
   const lives=getAllLives();
-  const expired=lives.filter(l=>isLiveExpired(l));
-  const active=lives.filter(l=>!isLiveExpired(l));
   const sel=document.getElementById('arc-edit-live-select');
   if(!sel) return;
   if (document.activeElement === sel) return;
-  let html='<option value="">-- 選択 --</option>';
-  if(expired.length>0){
-    html+='<optgroup label="終了ライブ">';
-    html+=expired.map(l=>`<option value="${esc(l.name)}"${l.name===curLive?' selected':''}>${esc(l.name)}</option>`).join('');
-    html+='</optgroup>';
-  }
-  if(active.length>0){
-    html+='<optgroup label="開催中・予定">';
-    html+=active.map(l=>`<option value="${esc(l.name)}"${l.name===curLive?' selected':''}>${esc(l.name)}</option>`).join('');
-    html+='</optgroup>';
-  }
   const isOther=curLive&&!lives.find(l=>l.name===curLive);
+  let html='<option value="">-- 選択 --</option>';
+  html+=buildArchiveLiveOptgroups(lives, curLive);
   html+=`<option value="__other__"${isOther?' selected':''}>その他（手入力）</option>`;
   sel.innerHTML=html;
   sel.value = isOther ? '__other__' : curLive;
@@ -3135,17 +3391,20 @@ async function submitArchiveEdit(){
   const comment=document.getElementById('arc-edit-comment').value.trim();
   isSubmittingArchiveEdit = true;
   const prev={...arc};
-  Object.assign(arc,{name,liveName,performance,seatType,comment});
-  closeArchiveEditModal();
-  renderArchives();
-  toast('参戦履歴を更新しました');
-  const r=await postToGas({action:'updateArchive',id,name,liveName,performance,seatType,comment});
-  if(!r||(!r.success&&!r.local)){
-    Object.assign(arc,prev);
+  try {
+    Object.assign(arc,{name,liveName,performance,seatType,comment});
+    closeArchiveEditModal();
     renderArchives();
-    toast('更新に失敗しました','error');
+    toast('参戦履歴を更新しました');
+    const r=await postToGas({action:'updateArchive',id,name,liveName,performance,seatType,comment});
+    if(!r||(!r.success&&!r.local)){
+      Object.assign(arc,prev);
+      renderArchives();
+      toast('更新に失敗しました','error');
+    }
+  } finally {
+    isSubmittingArchiveEdit = false;
   }
-  isSubmittingArchiveEdit = false;
 }
 async function deleteManualArchive(arcId){
   if(!confirm('この参戦履歴を削除しますか？')) return;
@@ -3224,8 +3483,11 @@ async function fetchFromGas(){
   _isFetchingGas = true;
   setMatchLoading(true);
   setMemberLoading(true);
+  const _fetchCtrl = new AbortController();
+  const _fetchTimer = setTimeout(() => _fetchCtrl.abort(), 15000);
   try {
-    const res=await fetch(GAS_URL+'?t='+Date.now());
+    const res=await fetch(GAS_URL+'?t='+Date.now(), { signal: _fetchCtrl.signal });
+    clearTimeout(_fetchTimer);
     if(!res.ok) throw new Error('HTTP '+res.status);
     const data=await res.json();
     const ws=currentWs();
@@ -3237,12 +3499,19 @@ async function fetchFromGas(){
       if (typeof p === 'string') {
         try { p = JSON.parse(p); } catch(e) { p = []; }
       }
-      return {...l, performances: Array.isArray(p) ? p : []};
+      return {
+        ...l,
+        performances: Array.isArray(p) ? p : [],
+        manualEnded: l.manualEnded === true || l.manualEnded === 'true',
+        endDate: (l.endDate !== undefined && l.endDate !== null) ? String(l.endDate) : ''
+      };
     };
 
     if((data.lives||[]).length>0){
-      gasLives=data.lives.map(normLives);
-      localStorage.setItem(GM_LIVES,'1');
+      if(!_pendingLivesSync){
+        gasLives=data.lives.map(normLives);
+        localStorage.setItem(GM_LIVES,'1');
+      }
     } else if(!localStorage.getItem(GM_LIVES)){
       const localLives=ws.lives||[];
       if(localLives.length>0){
@@ -3292,13 +3561,24 @@ async function fetchFromGas(){
       if(!gasMembers.length) gasMembers=[...(ws.members||[])];
     }
 
+    // ── Live categories（GAS が返した場合のみ上書き）──────────────────────
+    if(Array.isArray(data.categories)&&data.categories.length>0){
+      ws.liveCategories=data.categories;
+      saveState();
+    } else if(!ws.liveCategories||ws.liveCategories.length===0){
+      ws.liveCategories=JSON.parse(JSON.stringify(DEFAULT_CATEGORIES));
+      saveState();
+    }
+
     // ── Archives ──────────────────────────────────────────────────────────
     gasArchives=(data.archives||[]).map(a=>({...a,id:String(a.id)}));
     if(gasArchives.length>0) localStorage.setItem(GM_ARCHIVES,'1');
 
     renderAll();
   } catch(err){
-    toast('データの取得に失敗しました: '+err.message,'error');
+    clearTimeout(_fetchTimer);
+    const msg = err.name==='AbortError' ? '通信がタイムアウトしました（15秒）' : 'データの取得に失敗しました: '+err.message;
+    toast(msg,'error');
     const ws=currentWs();
     if(!gasLives.length)   gasLives=[...ws.lives];
     if(!gasBoard.length)   gasBoard=[...(ws.matchingBoard||[])];
@@ -3314,7 +3594,9 @@ async function fetchFromGas(){
 // syncLives 1回のリクエストで削除＋一括書き込みをアトミックに実行
 // GAS側でLockService + setValues により排他制御と高速書き込みを保証
 async function syncLivesToGas(lives){
-  const r=await postToGas({action:'syncLives',lives});
+  const ws=currentWs();
+  const categories=ws.liveCategories||[];
+  const r=await postToGas({action:'syncLives',lives,categories});
   if(!r) return null;
   if(r.local) return 'local';
   return r.success ? true : false;
@@ -3322,18 +3604,23 @@ async function syncLivesToGas(lives){
 
 async function postToGas(payload){
   if(!GAS_URL||GAS_URL==='YOUR_GAS_WEB_APP_URL') return {success:true,local:true};
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 15000);
   try {
     const body=JSON.stringify(payload);
     // URL長制限(約2KB)を超えるペイロードはPOSTで送信（syncLives等）
     const res = body.length > 800
-      ? await fetch(GAS_URL, {method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'}, body})
-      : await fetch(GAS_URL+'?payload='+encodeURIComponent(body)+'&t='+Date.now());
+      ? await fetch(GAS_URL, {method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'}, body, signal: ctrl.signal})
+      : await fetch(GAS_URL+'?payload='+encodeURIComponent(body)+'&t='+Date.now(), { signal: ctrl.signal });
+    clearTimeout(timer);
     if(!res.ok) throw new Error('HTTP '+res.status);
     const json=await res.json();
     if(!json.success&&!json.local) console.warn('[GAS write failed]',payload.action,json);
     return json;
   } catch(err){
-    toast('通信エラー: '+err.message,'error');
+    clearTimeout(timer);
+    const msg = err.name==='AbortError' ? '通信タイムアウト（15秒）' : '通信エラー: '+err.message;
+    toast(msg,'error');
     return null;
   }
 }
@@ -3366,7 +3653,8 @@ function bindEvents(){
   document.getElementById('ws-modal').addEventListener('click',e=>{ if(e.target===document.getElementById('ws-modal')) closeWsModal(); });
   document.getElementById('new-ws-name').addEventListener('keydown',e=>{ if(e.key==='Enter') createWorkspace(); });
 
-  document.getElementById('settings-btn').addEventListener('click',openSettings);
+  document.getElementById('settings-btn').addEventListener('click',showAdminAuthModal);
+  document.getElementById('admin-passcode-input')?.addEventListener('keydown',e=>{ if(e.key==='Enter') submitAdminAuth(); });
   document.getElementById('settings-modal').addEventListener('click',e=>{ if(e.target===document.getElementById('settings-modal')) triggerSettingsShake(); });
 
   document.getElementById('f-live').addEventListener('change',updatePerfSelect);
