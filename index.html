@@ -1777,12 +1777,18 @@ function getOption(type){
 // MEMBER FORM
 // ============================================================
 function populateFormSelects(){
-  const lives=getAllLives();
   const liveEl=document.getElementById('f-live');
   if (document.activeElement === liveEl) return;
   const selLive=liveEl.value;
-  liveEl.innerHTML=buildLiveOptgroups(lives, selLive, '<option value="">-- 選択 --</option>');
-  liveEl.value = selLive;
+  const activeLives=getActiveLives();
+  let html=buildLiveOptgroups(activeLives, selLive, '<option value="">-- 選択 --</option>');
+  // 編集中メンバーのライブが終了済みの場合、選択肢に残す（データを壊さないため）
+  if(selLive && !activeLives.find(l=>l.name===selLive)){
+    const expired=getAllLives().find(l=>l.name===selLive);
+    if(expired) html+=`<optgroup label="終了済み"><option value="${esc(expired.name)}" selected>${esc(expired.name)}（終了）</option></optgroup>`;
+  }
+  liveEl.innerHTML=html;
+  liveEl.value=selLive;
   updatePerfSelect();
   buildSeatBtns();
 }
@@ -1818,6 +1824,15 @@ async function onFormSubmit(){
   };
 
   if(!editId){
+    // 新規追加時、終了済みライブへの登録を防ぐ（フォームUIを突破された場合のフェイルセーフ）
+    if(data.live){
+      const targetLive=getAllLives().find(l=>l.name===data.live);
+      if(targetLive && isLiveExpired(targetLive)){
+        _shake(document.getElementById('f-live'));
+        toast(`「${data.live}」は終了済みのライブです。新規追加はできません`,'error');
+        return;
+      }
+    }
     const dupLive=data.live||''; const dupPerf=data.performance||'';
     const isDup=gasMembers.some(m=>m.name===name&&(m.live||'')=== dupLive&&(m.performance||'')=== dupPerf);
     if(isDup){
@@ -1878,7 +1893,17 @@ function startEdit(id){
 function _doStartEdit(m){
   document.getElementById('f-edit-id').value=m.id;
   document.getElementById('f-name').value=m.name;
-  document.getElementById('f-live').value=m.live||'';
+  // ドロップダウンを先に構築してから値をセット（終了済みライブへの対応）
+  const liveEl=document.getElementById('f-live');
+  const selLive=m.live||'';
+  const activeLives=getActiveLives();
+  let liveHtml=buildLiveOptgroups(activeLives, selLive, '<option value="">-- 選択 --</option>');
+  if(selLive && !activeLives.find(l=>l.name===selLive)){
+    const expired=getAllLives().find(l=>l.name===selLive);
+    if(expired) liveHtml+=`<optgroup label="終了済み"><option value="${esc(expired.name)}">${esc(expired.name)}（終了）</option></optgroup>`;
+  }
+  liveEl.innerHTML=liveHtml;
+  liveEl.value=selLive;
   updatePerfSelect();
   document.getElementById('f-perf').value=m.performance||'';
   document.getElementById('f-seat').value=m.seatType||'一般';
@@ -1986,22 +2011,22 @@ function renderStatsCards(){
   `).join('');
 }
 function renderFilterOptions(){
-  const ws=currentWs();
-  const lives=gasLives.length>0?gasLives:ws.lives;
+  const activeLives=getActiveLives();
   const flLive=document.getElementById('filter-live');
   const flPerf=document.getElementById('filter-perf');
-  const selLive=flLive.value, selPerf=flPerf.value;
-  // 各ドロップダウンが操作中のときだけ、そのドロップダウンの再描画を個別にスキップする
-  // （片方がアクティブでも、もう片方は必ず更新する）
+  let selLive=flLive.value, selPerf=flPerf.value;
+  // 選択中のライブが終了済みになった場合は自動リセット
+  if(selLive && !activeLives.find(l=>l.name===selLive)){ selLive=''; selPerf=''; }
+  // 当落管理は活動中メンバーのみ表示するため、フィルターも活動中ライブのみ提供
   if (document.activeElement !== flLive) {
-    flLive.innerHTML=buildLiveOptgroups(lives, selLive, '<option value="">全ライブ</option>');
-    flLive.value = selLive;
+    flLive.innerHTML=buildLiveOptgroups(activeLives, selLive, '<option value="">全ライブ</option>');
+    flLive.value=selLive;
   }
   if (document.activeElement !== flPerf) {
-    const lv=lives.find(l=>l.name===selLive);
+    const lv=activeLives.find(l=>l.name===selLive);
     flPerf.innerHTML='<option value="">全公演</option>'+
       (lv?.performances||[]).map(p=>`<option value="${esc(p.name)}"${p.name===selPerf?' selected':''}>${esc(p.name)}</option>`).join('');
-    flPerf.value = selPerf;
+    flPerf.value=selPerf;
   }
 }
 function getFiltered(){
